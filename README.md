@@ -10,7 +10,10 @@ NiFi equivalent built using Rust.
 ## Add a new library package
 Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
 
-## Plan (temporary until we move this repo to GitHub)
+## Plan
+- [x] Create simplest possible processor
+- [ ] Write code with unit tests to verify if a processor can send message to other
+- [ ] Create simplest possible data structure which will hold processors and connection between them
 - [ ] Understand how content repository works (Flowfile does not store payload/content within itself, it keeps a pointer to content repository)
 - [ ] Implement content repository
 - [ ] Use content repository to implement flow file
