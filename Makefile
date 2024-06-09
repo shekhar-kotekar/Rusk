@@ -1,3 +1,5 @@
+.PHONY: prepare test run release
+
 prepare:
 	cargo fmt && cargo clippy && cargo check
 
