@@ -9,12 +9,12 @@ use super::base_processor::{Packet, Processor, ProcessorStatus};
 pub struct RandomNumberGeneratorProcessor {
     pub name: String,
     pub uuid: Uuid,
-    pub tx: HashMap<String, mpsc::Sender<Packet>>,
+    pub tx: HashMap<String, mpsc::Sender<Packet<u16>>>,
     pub status: ProcessorStatus,
     pub sleep_time_milliseconds: u16,
 }
 
-impl Processor for RandomNumberGeneratorProcessor {
+impl Processor<u16> for RandomNumberGeneratorProcessor {
     fn new(name: String) -> Self {
         RandomNumberGeneratorProcessor {
             name,
@@ -25,10 +25,10 @@ impl Processor for RandomNumberGeneratorProcessor {
         }
     }
 
-    async fn process(&self, _receiver: Option<mpsc::Receiver<Packet>>) {
+    async fn process(&mut self, _receiver: Option<mpsc::Receiver<Packet<u16>>>) {
         loop {
             let random_number = rand::random::<u16>();
-            let packet = Packet::new([random_number; 10], Default::default());
+            let packet = Packet::new(random_number, HashMap::new());
             tracing::info!("{} generated: {:?}", self.name, packet);
 
             for (key, sender) in self.tx.iter() {

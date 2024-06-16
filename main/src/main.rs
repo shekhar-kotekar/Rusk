@@ -1,5 +1,5 @@
 use processors::{
-    add_one_processor,
+    add_one_processor::AddOneProcessor,
     base_processor::{Packet, Processor},
     random_number_generator::RandomNumberGeneratorProcessor,
 };
@@ -12,7 +12,7 @@ const PROCESSOR_DEFAULT_QUEUE_LENGTH: usize = 100;
 #[tokio::main]
 async fn main() {
     commons::enable_tracing();
-    let (tx, rx) = mpsc::channel::<Packet>(PROCESSOR_DEFAULT_QUEUE_LENGTH);
+    let (tx, rx) = mpsc::channel::<Packet<u16>>(PROCESSOR_DEFAULT_QUEUE_LENGTH);
     let mut random_number_generator_processor =
         RandomNumberGeneratorProcessor::new("R1".to_string());
 
@@ -20,7 +20,7 @@ async fn main() {
         .tx
         .insert("AddOne".to_string(), tx.clone());
 
-    let add_one_processor = add_one_processor::AddOneProcessor::new("Add One".to_string());
+    let mut add_one_processor = AddOneProcessor::new("Add One".to_string());
 
     tokio::spawn(async move {
         random_number_generator_processor.process(None).await;
