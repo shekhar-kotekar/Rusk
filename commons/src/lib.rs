@@ -8,6 +8,7 @@ pub fn enable_tracing() {
         .with_line_number(true)
         .with_target(false)
         .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
+        .with_thread_ids(true)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     tracing::info!("Tracing enabled!");

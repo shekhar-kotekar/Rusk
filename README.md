@@ -31,7 +31,7 @@ rough idea about how to create and manage processors and connections between the
     - remove rx from the vector of rx in receving processor
     - if no other tx and rx using the channel then flush, close, delete the channel
 - questions
-    - who will monitor list of channels and connctions?
+    - who will monitorg list of channels and connctions?
 
 ## References:
 - NiFi docs : https://nifi.apache.org/docs/nifi-docs/html/nifi-in-depth.html#intro
