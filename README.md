@@ -7,8 +7,13 @@ NiFi equivalent built using Rust.
 - Execute `make test` to test entire project
 - Execute `make release` to create a release mode version of the project 
 
-## Add a new library package
-Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
+## Rusk Web module
+Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
+Execute `docker build -t rusk_web:latest .` command build Docker image
+
+## Useful commands:
+### Add a new library package
+- Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
 
 ## Plan
 - [x] Create simplest possible processor

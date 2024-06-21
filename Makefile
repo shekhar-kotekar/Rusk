@@ -1,4 +1,4 @@
-.PHONY: prepare test run release
+.PHONY: prepare test run release build_web
 
 prepare:
 	cargo fmt && cargo clippy && cargo check
@@ -11,3 +11,6 @@ run: test
 
 release: test
 	cargo build --release
+
+build_web: prepare
+	docker build -t rust_web:latest -f rusk_web/Dockerfile .
