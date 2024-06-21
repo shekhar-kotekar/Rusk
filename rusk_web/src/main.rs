@@ -1,27 +1,16 @@
 use axum::{routing::get, Router};
 
+const SERVER_PORT: &str = "5056";
+
 #[tokio::main]
 async fn main() {
     commons::enable_tracing();
-    tracing::info!("Starting rusk web server");
+    let server_address = format!("localhsot:{}", SERVER_PORT);
+    tracing::info!("Starting rusk web server on: {}", server_address);
     let server = Router::new().route("/", get(root));
-    let listener = tokio::net::TcpListener::bind("").await.unwrap();
+    let listener = tokio::net::TcpListener::bind(server_address).await.unwrap();
     axum::serve(listener, server).await.unwrap();
 }
-
-// fn enable_tracing() {
-//     let subscriber = tracing_subscriber::fmt::Subscriber::builder()
-//         .with_max_level(tracing::Level::DEBUG)
-//         .compact()
-//         .with_file(true)
-//         .with_line_number(true)
-//         .with_target(false)
-//         .with_span_events(FmtSpan::ENTER | FmtSpan::CLOSE)
-//         .with_thread_ids(true)
-//         .finish();
-//     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-//     tracing::info!("Tracing enabled!");
-// }
 
 async fn root() -> &'static str {
     "Hello, World!"

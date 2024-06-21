@@ -9,7 +9,7 @@ NiFi equivalent built using Rust.
 
 ## Rusk Web module
 Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
-Execute `docker build -t rusk_web:latest .` command build Docker image
+Execute `make build_web` command build Docker image
 
 ## Useful commands:
 ### Add a new library package
