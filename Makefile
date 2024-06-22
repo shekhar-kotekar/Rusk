@@ -13,8 +13,9 @@ release: test
 	cargo build --release
 
 build_web: prepare
+	cargo test --package commons && \
+    cargo test --package rusk_web
 	# --progress plain
 	docker build -t rust_web:latest -f rusk_web/Dockerfile .
 	@echo "web server built successfully!"
 	@echo "run 'docker run -it -p 8080:5056 rust_web:latest' to start the server"
-	

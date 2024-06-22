@@ -8,11 +8,7 @@ COPY Cargo.toml Cargo.lock /rusk_web_app/
 COPY . /rusk_web_app/
 RUN echo $(ls -ltrh /rusk_web_app)
 
-# RUN cargo test && cargo build --target x86_64-unknown-linux-musl --release
-RUN cargo clean && \
-    cargo test --package commons && \
-    cargo test --package rusk_web && \
-    cargo build --package rusk_web --release
+RUN cargo build --package rusk_web --release
 
 RUN echo $(ls -ltrh /rusk_web_app/target/release/)
 

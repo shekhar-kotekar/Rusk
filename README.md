@@ -1,5 +1,5 @@
 # Rusk
-NiFi equivalent built using Rust.
+NiFi equivalent built using Rust. Architecture can be found [here](https://docs.google.com/presentation/d/1vFsGreuPf5521KDLQnLpkzTRDoSvygRhhJjB9mcVgaA/edit#slide=id.p)
 
 ## Getting started
 - Make sure that Make, git and Rust is installed.
