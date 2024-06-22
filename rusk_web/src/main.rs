@@ -5,14 +5,15 @@ const SERVER_PORT: &str = "5056";
 #[tokio::main]
 async fn main() {
     commons::enable_tracing();
-    let server_address = format!("localhsot:{}", SERVER_PORT);
-    tracing::info!("Starting rusk web server on: {}", server_address);
+    let server_address = format!("0.0.0.0:{}", SERVER_PORT);
+    tracing::info!("Starting rusk web server on {}", server_address);
     let server = Router::new().route("/", get(root));
     let listener = tokio::net::TcpListener::bind(server_address).await.unwrap();
     axum::serve(listener, server).await.unwrap();
 }
 
 async fn root() -> &'static str {
+    tracing::info!("Received request");
     "Hello, World!"
 }
 

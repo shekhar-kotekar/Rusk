@@ -12,7 +12,7 @@ RUN echo $(ls -ltrh /rusk_web_app)
 RUN cargo clean && \
     cargo test --package commons && \
     cargo test --package rusk_web && \
-    cargo build --release
+    cargo build --package rusk_web --release
 
 RUN echo $(ls -ltrh /rusk_web_app/target/release/)
 

@@ -12,8 +12,8 @@ Accepts requests from UI and takes actions like adding a processor, connecting 2
 Execute `make build_web` command build Docker image
 
 ## Useful commands:
-### Add a new library package
-- Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
+- To add a new library package, Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
+- To run an individual package within a workspace, execute `cargo run -p <MODULE NAME>`. Example : `cargo run -p rusk_web`
 
 ## Plan
 - [x] Create simplest possible processor
