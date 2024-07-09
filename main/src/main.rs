@@ -1,44 +1,86 @@
+use std::time::Duration;
+
 use processors::{
-    add_one_processor::AddOneProcessor,
-    base_processor::{Packet, Processor},
-    random_number_generator::RandomNumberGeneratorProcessor,
+    in_memory_processor::InMemoryProcessor,
+    models::{InMemoryPacket, ProcessorCommand},
 };
-use tokio::sync::mpsc;
+use tokio::{signal, sync::broadcast, time::sleep};
+use uuid::Uuid;
 
 mod processors;
-
-const PROCESSOR_DEFAULT_QUEUE_LENGTH: usize = 100;
 
 #[tokio::main]
 async fn main() {
     commons::enable_tracing();
-    let (tx, rx) = mpsc::channel::<Packet<u16>>(PROCESSOR_DEFAULT_QUEUE_LENGTH);
-    let mut random_number_generator_processor =
-        RandomNumberGeneratorProcessor::new("R1".to_string());
+    let (tx, rx) = broadcast::channel::<ProcessorCommand>(10);
+    let mut adder_processor = InMemoryProcessor::new("Adder".to_string(), tx.clone(), rx);
+    let mut doubler_processor =
+        InMemoryProcessor::new("Doubler".to_string(), tx.clone(), tx.subscribe());
 
-    random_number_generator_processor
-        .tx
-        .insert("AddOne".to_string(), tx.clone());
-
-    let mut add_one_processor = AddOneProcessor::new("Add One".to_string());
-
-    tokio::spawn(async move {
-        random_number_generator_processor.process(None).await;
+    let adder_handle = tokio::spawn(async move {
+        adder_processor.run(adder_func).await;
+    });
+    let doubler_handle = tokio::spawn(async move {
+        doubler_processor.run(doubler_func).await;
     });
 
-    let mut r2 = RandomNumberGeneratorProcessor::new("R2".to_string());
-    r2.tx.insert("AddOne".to_string(), tx.clone());
+    tx.send(ProcessorCommand::InMemoryMessage(InMemoryPacket {
+        id: Uuid::new_v4(),
+        data: vec![1, 2, 3],
+    }));
 
-    tokio::spawn(async move {
-        r2.process(None).await;
-    });
+    tx.send(ProcessorCommand::InMemoryMessage(InMemoryPacket {
+        id: Uuid::new_v4(),
+        data: vec![4, 5, 6],
+    }));
 
-    tokio::spawn(async move {
-        add_one_processor.process(Some(rx)).await;
-    });
-    tracing::info!("task spawned for AddOneProcessor");
+    tx.send(ProcessorCommand::Pause);
+    sleep(Duration::from_secs(2)).await;
+    tx.send(ProcessorCommand::Resume);
 
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    tx.send(ProcessorCommand::InMemoryMessage({
+        InMemoryPacket {
+            id: Uuid::new_v4(),
+            data: vec![7, 8, 9],
+        }
+    }));
+
+    match signal::ctrl_c().await {
+        Ok(_) => {
+            tracing::info!("Ctrl-C received, shutting down");
+            tx.send(ProcessorCommand::Shutdown);
+            tokio::join!(adder_handle, doubler_handle);
+        }
+        Err(e) => {
+            tracing::error!("Error: {:?}", e);
+        }
     }
+}
+
+fn adder_func(packet: InMemoryPacket) -> InMemoryPacket {
+    let new_data = packet.data.iter().map(|x| x + 1).collect();
+    let new_packet = InMemoryPacket {
+        id: packet.id,
+        data: new_data,
+    };
+    tracing::info!(
+        "old data: {:?}, new data: {:?}",
+        packet.data,
+        new_packet.data
+    );
+    new_packet
+}
+
+fn doubler_func(packet: InMemoryPacket) -> InMemoryPacket {
+    let new_data = packet.data.iter().map(|x| x * 2).collect();
+    let new_packet = InMemoryPacket {
+        id: packet.id,
+        data: new_data,
+    };
+    tracing::info!(
+        "old data: {:?}, new data: {:?}",
+        packet.data,
+        new_packet.data
+    );
+    new_packet
 }
