@@ -1,28 +1,33 @@
-use tokio::sync::mpsc;
-use uuid::Uuid;
+use std::time::Duration;
 
-use crate::processors::models::ProcessorCommand;
+use tokio::{sync::mpsc, time::sleep};
+use uuid::Uuid;
 
 use super::{
     base_processor::Processor,
-    models::{InMemoryPacket, ProcessorStatus},
+    models::{InMemoryPacket, ProcessorCommand, ProcessorStatus},
 };
 
-pub struct InMemoryProcessor {
+pub struct InMemorySourceProcessor {
     pub processor_name: String,
     pub processor_id: Uuid,
     tx: Vec<mpsc::Sender<ProcessorCommand>>,
     rx: mpsc::Receiver<ProcessorCommand>,
     pub status: ProcessorStatus,
+    delay: u64,
 }
 
-impl Processor for InMemoryProcessor {
-    fn new(processor_name: String, rx: mpsc::Receiver<ProcessorCommand>) -> InMemoryProcessor {
-        InMemoryProcessor {
+impl Processor for InMemorySourceProcessor {
+    fn new(
+        processor_name: String,
+        rx: mpsc::Receiver<ProcessorCommand>,
+    ) -> InMemorySourceProcessor {
+        InMemorySourceProcessor {
             processor_name,
             processor_id: Uuid::new_v4(),
             tx: Vec::new(),
             rx,
+            delay: 1000,
             status: ProcessorStatus::Stopped,
         }
     }
@@ -31,44 +36,43 @@ impl Processor for InMemoryProcessor {
     }
 }
 
-impl InMemoryProcessor {
-    pub async fn run(&mut self, process_packet_func: fn(InMemoryPacket) -> Option<InMemoryPacket>) {
+impl InMemorySourceProcessor {
+    pub async fn run(&mut self, generate_packet_func: fn() -> InMemoryPacket) {
         loop {
             match self.status {
                 ProcessorStatus::Running => {
-                    let result = self.rx.recv().await;
-                    match result {
-                        Some(ProcessorCommand::InMemoryMessage(packet)) => {
-                            tracing::info!(
-                                "{}: Processing packet : {:?}",
-                                self.processor_name,
-                                packet
-                            );
-                            let processed_packet = process_packet_func(packet);
-                            match processed_packet {
-                                Some(packet) => {
-                                    for tx in self.tx.iter() {
-                                        let new_command =
-                                            ProcessorCommand::InMemoryMessage(packet.clone());
-                                        tx.send(new_command).await.unwrap();
-                                    }
-                                }
-                                None => {
-                                    // write code to send error to error channel
-                                }
+                    if self.tx.is_empty() {
+                        tracing::info!(
+                            "{}: No processors to send packet to. Pausing.",
+                            self.processor_name
+                        );
+                        self.status = ProcessorStatus::Paused;
+                    } else {
+                        let packet = generate_packet_func();
+                        for tx in &self.tx {
+                            let _ = tx
+                                .send(ProcessorCommand::InMemoryMessage(packet.clone()))
+                                .await;
+                        }
+                        let result = self.rx.try_recv();
+                        match result {
+                            Ok(ProcessorCommand::Pause) => {
+                                self.status = ProcessorStatus::Paused;
+                                tracing::info!("{}: Paused", self.processor_name);
                             }
+                            Ok(ProcessorCommand::Shutdown) => {
+                                tracing::info!("{}: Shutting down", self.processor_name);
+                                break;
+                            }
+                            _ => {}
                         }
-                        Some(ProcessorCommand::Shutdown) => {
-                            tracing::info!("{}: Shutting down", self.processor_name);
-                            break;
-                        }
-                        Some(ProcessorCommand::Pause) => {
-                            tracing::info!("{}: Pausing", self.processor_name);
-                            self.status = ProcessorStatus::Paused;
-                        }
-                        _ => {
-                            // write code to send error to error channel
-                        }
+                        tracing::info!(
+                            "{}: packet sent to {} processors. Sleeping for {} ms.",
+                            self.processor_name,
+                            self.tx.len(),
+                            self.delay
+                        );
+                        sleep(Duration::from_millis(self.delay)).await;
                     }
                 }
                 ProcessorStatus::Paused => {

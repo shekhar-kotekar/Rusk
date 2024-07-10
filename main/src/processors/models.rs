@@ -1,7 +1,15 @@
 use uuid::Uuid;
 
+#[derive(Debug, Clone)]
+pub enum ProcessorStatus {
+    Paused,
+    Running,
+    Stopped,
+}
+
 #[derive(Clone, Debug)]
 pub enum ProcessorCommand {
+    Start,
     Pause,
     Resume,
     Shutdown,
