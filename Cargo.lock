@@ -178,6 +178,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "content_repository"
+version = "0.1.0"
+dependencies = [
+ "commons",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "cookie"
 version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

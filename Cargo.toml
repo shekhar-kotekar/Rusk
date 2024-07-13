@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [ 
-    "commons",
+    "commons", "content_repository",
     "main", 
     "rusk_web",
 ]

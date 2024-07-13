@@ -1,0 +1,13 @@
+[package]
+name = "content_repository"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+commons = { path = "../commons" }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+tokio = { version = "1.38.0", features = ["full"] }
+uuid = {version = "1.8.0", features = ["v4"]}
