@@ -1,3 +1,5 @@
+export CONFIG_FILE_PATH := config.toml
+
 .PHONY: prepare test run release build_web
 
 prepare:
@@ -19,3 +21,7 @@ build_web: prepare
 	docker build -t rust_web:latest -f rusk_web/Dockerfile .
 	@echo "web server built successfully!"
 	@echo "run 'docker run -it -p 8080:5056 rust_web:latest' to start the server"
+
+run_content_repo: test
+	@echo $$CONFIG_FILE_PATH
+	cargo run --package content_repository
