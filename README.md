@@ -17,26 +17,15 @@ Execute `make build_web` command build Docker image
 
 ## Plan
 - [x] Create simplest possible processor
-- [ ] Write code with unit tests to verify if a processor can send message to other
-- [ ] Create simplest possible data structure which will hold processors and connection between them
-- [ ] Understand how content repository works (Flowfile does not store payload/content within itself, it keeps a pointer to content repository)
+- [x] Write code with unit tests to verify if a processor can send message to other
+- [x] Create simplest possible data structure which will hold processors and connection between them
+- [x] Understand how content repository works (Flowfile does not store payload/content within itself, it keeps a pointer to content repository)
 - [ ] Implement content repository
 - [ ] Use content repository to implement flow file
 - [ ] Use Flow file to implement simplest "echo" processor (without attributes)
 
-### scratch pad
-rough idea about how to create and manage processors and connections between them
-- channels / pipe / queue is the key
-- When connection is made between two processors
-    - create a new MPSC channel
-    - add tx to the vector of tx in source processor
-    - add rx to the vector of rx in receving processor
-- When connection is deleted between two processors
-    - remove tx from the vector of tx in source processor
-    - remove rx from the vector of rx in receving processor
-    - if no other tx and rx using the channel then flush, close, delete the channel
-- questions
-    - who will monitorg list of channels and connctions?
+## Content Repository
+For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.
 
 ## References:
 - NiFi docs : https://nifi.apache.org/docs/nifi-docs/html/nifi-in-depth.html#intro
