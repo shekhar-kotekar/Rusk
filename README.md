@@ -27,5 +27,8 @@ Execute `make build_web` command build Docker image
 ## Content Repository
 For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.
 
+- Content repository will run as another process, possibly in a separate pod so that we can scale-out if necessary and to keep all the modules decoupled as much as possible.
+- We can run content repository in core Rusk itself and use MPSC channels for communication between processor and content repository but it will make modules tightly coupled and in case of a crash all the modules will crash.
+
 ## References:
 - NiFi docs : https://nifi.apache.org/docs/nifi-docs/html/nifi-in-depth.html#intro
