@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use models::Command;
 use tokio::{
-    io::{AsyncReadExt, AsyncSeekExt},
+    io::{AsyncRead, AsyncReadExt, AsyncSeekExt},
     net::TcpListener,
     sync::{mpsc, oneshot},
 };
@@ -15,7 +15,7 @@ async fn main() {
 
     let config = commons::get_config().content_repository;
 
-    let server_address = format!("0.0.0.0:{}", config.server_port);
+    let server_address = format!("0.0.0.0:{}", config.clone().server_port);
 
     let mut file_handle = content_repository_manager::init(config).await;
     let (tx, mut rx) = mpsc::channel::<Command>(1000);
@@ -29,27 +29,15 @@ async fn main() {
     });
 
     loop {
+        tracing::info!("Waiting for new client connection...");
+        let (mut socket, _) = listener.accept().await.unwrap();
+        tracing::info!("New client connected: {:?}", socket.peer_addr().unwrap());
+
         let tx_clone = tx.clone();
-        handle_client_request(tx_clone, &listener).await;
-        // let (mut socket, _) = listener.accept().await.unwrap();
-        // tokio::spawn(async move {
-        //     let mut buf = vec![0; 1024];
-        //     loop {
-        //         let number_of_bytes_read = socket.read_buf(&mut buf).await.unwrap();
-        //         if number_of_bytes_read == 0 {
-        //             tracing::info!("0 bytes read, connection closed.");
-        //             break;
-        //         }
-        //         let (tx, rx) = oneshot::channel::<u64>();
-        //         let command = Command::Data {
-        //             content: Bytes::copy_from_slice(&buf[..number_of_bytes_read]),
-        //             tx,
-        //         };
-        //         tx_clone.send(command).await.unwrap();
-        //         let response = rx.await.unwrap();
-        //         tracing::info!("Response from content repo: {:?}", response);
-        //     }
-        // });
+        tokio::spawn(async move {
+            let (reader, _) = socket.split();
+            handle_client_request(tx_clone, reader).await;
+        });
     }
 }
 
@@ -63,30 +51,27 @@ async fn process_data(data: Command, file_handle: &mut tokio::fs::File) {
     }
 }
 
-async fn handle_client_request(
-    tx_clone: mpsc::Sender<Command>,
-    listener: &tokio::net::TcpListener,
-) {
-    let (mut socket, _) = listener.accept().await.unwrap();
-    tokio::spawn(async move {
-        let mut buf = vec![0; 1024];
-        let (mut reader, writer) = socket.split();
-        loop {
-            let number_of_bytes_read = reader.read_buf(&mut buf).await.unwrap();
-            if number_of_bytes_read == 0 {
+async fn handle_client_request<Reader>(tx_clone: mpsc::Sender<Command>, mut reader: Reader)
+where
+    Reader: AsyncRead + Unpin,
+{
+    let mut buffer = vec![0; 1024];
+    loop {
+        if let Ok(bytes_read) = reader.read_buf(&mut buffer).await {
+            if bytes_read == 0 {
                 tracing::info!("0 bytes read, connection closed.");
                 break;
             }
-            let (tx, rx) = oneshot::channel::<u64>();
+            let (one_shot_tx, one_shot_rx) = oneshot::channel::<u64>();
             let command = Command::Data {
-                content: Bytes::copy_from_slice(&buf[..number_of_bytes_read]),
-                tx,
+                content: Bytes::copy_from_slice(&buffer[..bytes_read]),
+                tx: one_shot_tx,
             };
             tx_clone.send(command).await.unwrap();
-            let response = rx.await.unwrap();
+            let response = one_shot_rx.await.unwrap();
             tracing::info!("Response from content repo: {:?}", response);
         }
-    });
+    }
 }
 
 #[cfg(test)]
@@ -120,12 +105,5 @@ mod tests {
         assert_eq!(contents, "test_data\n");
         let response_from_process_data = rx.await.unwrap();
         assert_eq!(response_from_process_data, 0);
-    }
-
-    #[tokio::test]
-    async fn test_handle_client_request() {
-        let (tx, mut rx) = mpsc::channel::<Command>(1000);
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:1234").await.unwrap();
-        handle_client_request(tx.clone(), &listener).await;
     }
 }

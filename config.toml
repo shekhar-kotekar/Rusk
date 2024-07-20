@@ -2,3 +2,4 @@
 base_path = "/tmp/rusk/content_repository"
 file_name_prefix = "wal"
 server_port = 8080
+queue_size = 1000

@@ -29,7 +29,7 @@ pub fn get_config() -> Config {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ContentRepositoryConfig {
     pub base_path: String,
     pub file_name_prefix: String,
