@@ -1,3 +1,5 @@
+use serde::Deserialize;
+use std::{env, fmt::Debug};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 pub fn enable_tracing() {
@@ -12,4 +14,29 @@ pub fn enable_tracing() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
     tracing::info!("Tracing enabled!");
+}
+
+pub fn get_config() -> Config {
+    match env::var("CONFIG_FILE_PATH") {
+        Ok(config_file_path) => {
+            tracing::info!("Reading config from file: {}", config_file_path);
+            let config_file = std::fs::read_to_string(config_file_path).unwrap();
+            toml::from_str(&config_file).unwrap()
+        }
+        Err(_) => {
+            panic!("CONFIG_FILE_PATH environment variable is not set");
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ContentRepositoryConfig {
+    pub base_path: String,
+    pub file_name_prefix: String,
+    pub server_port: u16,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    pub content_repository: ContentRepositoryConfig,
 }

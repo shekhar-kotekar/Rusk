@@ -1,27 +1,20 @@
+use commons::ContentRepositoryConfig;
 use tokio::{
     fs::{File, OpenOptions},
     io::AsyncWriteExt,
 };
 
-use crate::Config;
-
-pub async fn init(config: Config) -> File {
+pub async fn init(config: ContentRepositoryConfig) -> File {
     tracing::info!("Initializing content repository");
-    std::fs::create_dir_all(&config.content_repository.base_path).expect(
+    std::fs::create_dir_all(&config.base_path).expect(
         format!(
             "Failed to create content repository directory: {}",
-            config.content_repository.base_path
+            config.base_path
         )
         .as_str(),
     );
-    tracing::info!(
-        "Content repository directory created: {}",
-        config.content_repository.base_path
-    );
-    let file_path = format!(
-        "{}/{}.txt",
-        config.content_repository.base_path, config.content_repository.file_name_prefix
-    );
+    tracing::info!("Content repository directory created: {}", config.base_path);
+    let file_path = format!("{}/{}.txt", config.base_path, config.file_name_prefix);
     OpenOptions::new()
         .create(true)
         .append(true)
@@ -38,21 +31,18 @@ pub async fn append_data(file_handle: &mut File, data: &[u8]) {
 
 #[cfg(test)]
 mod tests {
+    use commons::ContentRepositoryConfig;
     use tempfile::tempdir;
-
-    use crate::ContentRepositoryConfig;
 
     use super::*;
     use std::{fs::File as StdFile, io::Read};
 
     #[tokio::test]
     async fn test_init() {
-        let test_config = Config {
-            content_repository: ContentRepositoryConfig {
-                base_path: String::from("/tmp"),
-                file_name_prefix: String::from("test_wal_init"),
-                server_port: 8080,
-            },
+        let test_config = ContentRepositoryConfig {
+            base_path: String::from("/tmp"),
+            file_name_prefix: String::from("test_wal_init"),
+            server_port: 8080,
         };
         let file_handle = init(test_config).await;
         let file = StdFile::open("/tmp/test_wal_init.txt").unwrap();
@@ -65,12 +55,10 @@ mod tests {
     #[tokio::test]
     async fn test_append_data() {
         let temp_dir = tempdir().unwrap();
-        let test_config = Config {
-            content_repository: ContentRepositoryConfig {
-                base_path: temp_dir.path().to_str().unwrap().to_string(),
-                file_name_prefix: String::from("test_wal_append"),
-                server_port: 8080,
-            },
+        let test_config = ContentRepositoryConfig {
+            base_path: temp_dir.path().to_str().unwrap().to_string(),
+            file_name_prefix: String::from("test_wal_append"),
+            server_port: 8080,
         };
         let mut file_handle = init(test_config).await;
 

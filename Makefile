@@ -25,3 +25,7 @@ build_web: prepare
 run_content_repo: test
 	@echo $$CONFIG_FILE_PATH
 	cargo run --package content_repository
+
+test_content_repo: prepare
+	cargo test -p content_repository --bin content_repository
+	
