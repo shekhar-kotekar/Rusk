@@ -10,7 +10,8 @@ COPY Cargo.toml Cargo.lock /${module_name}/
 COPY . /${module_name}/
 RUN echo $(ls -ltrh /${module_name})
 
-RUN cargo build --package ${module_name} --release
+RUN cargo test --package ${module_name} && \
+    cargo build --package ${module_name} --release
 
 RUN echo $(ls -ltrh /${module_name}/target/release/)
 
