@@ -28,7 +28,14 @@ test_content_repo: prepare
 	cargo test -p content_repository --bin content_repository
 
 build_content_repo: prepare
-	docker build -t content_repo:latest -f content_repository/Dockerfile .
+	docker build -t rusk_content_repo:latest -f content_repository/Dockerfile .
 	@echo "content repository built successfully!"
 	@echo "run 'docker run -it -p 8081:5057 content_repo:latest' to start the server"
+
+build_main: prepare
+	docker build -t rusk_main:latest -f main/Dockerfile .
+	@echo "Rusk main built successfully!"
+
+build_all: build_web build_content_repo build_main
+	@echo "All services built successfully!"
 	

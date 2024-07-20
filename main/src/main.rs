@@ -12,20 +12,23 @@ use uuid::Uuid;
 
 mod processors;
 
-const QUEUE_LENGTH: usize = 10;
-
 #[tokio::main]
 async fn main() {
     commons::enable_tracing();
+    let config = commons::get_config();
+    let main_config = config.rusk_main;
+
     let mut processor_tx: HashMap<Uuid, mpsc::Sender<ProcessorCommand>> = HashMap::new();
 
-    let (tx_for_adder, rx_for_adder) = mpsc::channel::<ProcessorCommand>(QUEUE_LENGTH);
+    let (tx_for_adder, rx_for_adder) =
+        mpsc::channel::<ProcessorCommand>(main_config.processor_queue_length);
 
     let mut adder_processor = InMemorySourceProcessor::new("Adder".to_string(), rx_for_adder);
 
     processor_tx.insert(adder_processor.processor_id, tx_for_adder);
 
-    let (tx_for_doubler, rx_for_doubler) = mpsc::channel::<ProcessorCommand>(QUEUE_LENGTH);
+    let (tx_for_doubler, rx_for_doubler) =
+        mpsc::channel::<ProcessorCommand>(main_config.processor_queue_length);
 
     let mut doubler_processor = InMemoryProcessor::new("Doubler".to_string(), rx_for_doubler);
     adder_processor.add_tx(tx_for_doubler.clone());

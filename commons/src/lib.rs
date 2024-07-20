@@ -24,7 +24,9 @@ pub fn get_config() -> Config {
             toml::from_str(&config_file).unwrap()
         }
         Err(_) => {
-            panic!("CONFIG_FILE_PATH environment variable is not set");
+            tracing::warn!("CONFIG_FILE_PATH environment variable is not set. Reading config from default file: config.toml");
+            let config_file = std::fs::read_to_string("config.toml").unwrap();
+            toml::from_str(&config_file).unwrap()
         }
     }
 }
@@ -36,7 +38,13 @@ pub struct ContentRepositoryConfig {
     pub server_port: u16,
 }
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct MainConfig {
+    pub processor_queue_length: usize,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub content_repository: ContentRepositoryConfig,
+    pub rusk_main: MainConfig,
 }

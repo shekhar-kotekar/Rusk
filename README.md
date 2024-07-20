@@ -7,6 +7,27 @@ NiFi equivalent built using Rust. Architecture can be found [here](https://docs.
 - Execute `make test` to test entire project
 - Execute `make release` to create a release mode version of the project 
 
+### Local development
+We use Minikube to check modules in local so make sure that Minikube is installed and "registry" addon is enabled.
+Execute below commands to enable and start local image registry:
+```
+minikube addons enable registry
+
+# this command keeps current terminal engaged so open another terminal
+kubectl port-forward --namespace kube-system service/registry 5000:80
+
+# this command runs docker container in interactive mode so open another terminal
+docker run --rm -it --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:host.docker.internal:5000"
+
+curl http://localhost:5000/v2/_catalog
+```
+
+Once local image registry is enabled and started tag docker image and push using below commands:
+```
+docker tag rusk_content_repo localhost:5000/rusk_content_repo:latest
+docker push localhost:5000/rusk_content_repo:latest
+```
+
 ## Rusk Web module
 Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
 Execute `make build_web` command build Docker image
