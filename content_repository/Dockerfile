@@ -1,0 +1,21 @@
+FROM docker.io/library/rust:alpine3.20 as builder
+
+RUN rustup default stable
+RUN apk add --no-cache musl-dev libpq gcc
+
+ARG module_name=content_repository
+
+WORKDIR /${module_name}
+COPY Cargo.toml Cargo.lock /${module_name}/
+COPY . /${module_name}/
+RUN echo $(ls -ltrh /${module_name})
+
+RUN cargo build --package ${module_name} --release
+
+RUN echo $(ls -ltrh /${module_name}/target/release/)
+
+FROM scratch
+ARG module_name=content_repository
+COPY --from=builder /${module_name}/target/release/${module_name} /${module_name}
+COPY ./config.toml /config.toml
+CMD [ "/content_repository" ]

@@ -28,4 +28,11 @@ run_content_repo: test
 
 test_content_repo: prepare
 	cargo test -p content_repository --bin content_repository
+
+build_content_repo: prepare
+	cargo test --package commons && \
+	cargo test --package content_repository --bin content_repository
+	docker build -t content_repo:latest -f content_repository/Dockerfile .
+	@echo "content repository built successfully!"
+	@echo "run 'docker run -it -p 8081:5057 content_repo:latest' to start the server"
 	
