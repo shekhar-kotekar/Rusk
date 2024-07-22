@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: content-repository
+  namespace: rusk
   labels:
     app: content-repository
 spec:
@@ -16,7 +17,7 @@ spec:
     spec:
       containers:
       - name: content-repository
-        image: content-repository:latest
+        image: localhost:5000/rusk_content_repo:latest
         ports:
         - containerPort: 5056
         resources:

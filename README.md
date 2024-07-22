@@ -13,13 +13,8 @@ Execute below commands to enable and start local image registry:
 ```
 minikube addons enable registry
 
-# this command keeps current terminal engaged so open another terminal
-kubectl port-forward --namespace kube-system service/registry 5000:80
-
 # this command runs docker container in interactive mode so open another terminal
-docker run --rm -it --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:host.docker.internal:5000"
-
-curl http://localhost:5000/v2/_catalog
+docker run --rm -it --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:$(minikube ip):5000"
 ```
 
 Once local image registry is enabled and started tag docker image and push using below commands:
@@ -53,3 +48,5 @@ For producer processors, instead of processor creating FlowFile by itself, it wi
 
 ## References:
 - NiFi docs : https://nifi.apache.org/docs/nifi-docs/html/nifi-in-depth.html#intro
+- Minikube local registry - https://minikube.sigs.k8s.io/docs/handbook/registry/
+- Minikube docker on MacOs - https://minikube.sigs.k8s.io/docs/handbook/registry/#docker-on-macos

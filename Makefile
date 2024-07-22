@@ -28,9 +28,16 @@ test_content_repo: prepare
 	cargo test -p content_repository --bin content_repository
 
 build_content_repo: prepare
-	docker build -t rusk_content_repo:latest -f content_repository/Dockerfile .
+	@echo "INFO: Make sure you have enabled minikube registry AND started alpine container as mentioned in README.md"
+	docker build --tag localhost:5000/rusk_content_repo:latest -f content_repository/Dockerfile .
+	docker push localhost:5000/rusk_content_repo:latest
 	@echo "content repository built successfully!"
 	@echo "run 'docker run -it -p 8081:5057 content_repo:latest' to start the server"
+
+deploy_content_repo: build_content_repo
+	kubectl apply -f k8s/common.yaml
+	kubectl apply -f k8s/content_repository.yaml 
+	@echo "content repository deployed successfully!"
 
 build_main: prepare
 	docker build -t rusk_main:latest -f main/Dockerfile .
