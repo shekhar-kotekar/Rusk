@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rusk-main
+  namespace: rusk
   labels:
     app: rusk-main
 spec:
@@ -16,7 +17,7 @@ spec:
     spec:
       containers:
       - name: rusk-main
-        image: rusk-main:latest
+        image: localhost:5000/rusk_main:latest
         ports:
         - containerPort: 5057
         resources:

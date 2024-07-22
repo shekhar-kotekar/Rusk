@@ -49,7 +49,7 @@ async fn main() {
         Ok(_) => {
             tracing::info!("Ctrl-C received, shutting down");
             for (_, tx) in processor_tx {
-                let _ = tx.send(ProcessorCommand::Shutdown).await.unwrap();
+                tx.send(ProcessorCommand::Shutdown).await.unwrap();
             }
             let result = tokio::join!(adder_handle, doubler_handle);
             match result {

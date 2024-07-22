@@ -29,8 +29,10 @@ test_content_repo: prepare
 
 build_content_repo: prepare
 	@echo "INFO: Make sure you have enabled minikube registry AND started alpine container as mentioned in README.md"
+	
 	docker build --tag localhost:5000/rusk_content_repo:latest -f content_repository/Dockerfile .
 	docker push localhost:5000/rusk_content_repo:latest
+	
 	@echo "content repository built successfully!"
 	@echo "run 'docker run -it -p 8081:5057 content_repo:latest' to start the server"
 
@@ -40,9 +42,26 @@ deploy_content_repo: build_content_repo
 	@echo "content repository deployed successfully!"
 
 build_main: prepare
-	docker build -t rusk_main:latest -f main/Dockerfile .
+	@echo "INFO: Make sure you have enabled minikube registry AND started alpine container as mentioned in README.md"
+
+	docker build -t localhost:5000/rusk_main:latest -f main/Dockerfile .
+	docker push localhost:5000/rusk_main:latest
+	
 	@echo "Rusk main built successfully!"
+
+deploy_main: build_main
+	kubectl apply -f k8s/common.yaml
+	kubectl apply -f k8s/main.yaml
+	@echo "Rusk main deployed successfully!"
 
 build_all: build_web build_content_repo build_main
 	@echo "All services built successfully!"
-	
+
+deploy_all: build_all
+	@echo "INFO: all modules deployed successfully!"
+
+delete_all:
+	kubectl delete -f k8s/content_repository.yaml
+	kubectl delete -f k8s/main.yaml
+	kubectl delete -f k8s/common.yaml
+	@echo "All deployments deleted successfully!"
