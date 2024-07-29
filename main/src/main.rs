@@ -23,7 +23,8 @@ async fn main() {
     let (tx_for_adder, rx_for_adder) =
         mpsc::channel::<ProcessorCommand>(main_config.processor_queue_length);
 
-    let mut adder_processor = InMemorySourceProcessor::new("Adder processor".to_string(), rx_for_adder);
+    let mut adder_processor =
+        InMemorySourceProcessor::new("Adder processor".to_string(), rx_for_adder);
 
     processor_tx.insert(adder_processor.processor_id, tx_for_adder);
 
