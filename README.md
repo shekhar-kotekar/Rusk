@@ -11,6 +11,11 @@ NiFi equivalent built using Rust. Architecture can be found [here](https://docs.
 We use Minikube to check modules in local so make sure that Minikube is installed and "registry" addon is enabled.
 Execute below commands to enable and start local image registry:
 ```
+# make sure that current context is set to minikube
+kubectl config current-context
+
+# start minikube with registry
+minikube start
 minikube addons enable registry
 
 # this command runs docker container in interactive mode so open another terminal
