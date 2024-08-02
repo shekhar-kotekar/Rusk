@@ -3,6 +3,7 @@ export CONFIG_FILE_PATH := config.toml
 .PHONY: prepare test run release build_web
 
 prepare:
+	kubectl config use-context minikube
 	cargo fmt && cargo clippy && cargo check
 
 test: prepare
@@ -29,10 +30,19 @@ deploy_client: deploy_common
 	@echo "Client is running on http://localhost:8080"
 
 build_web: prepare
-	docker build -t rust_web:latest -f rusk_web/Dockerfile .
+	docker build --tag localhost:5000/rusk_web:latest -f rusk_web/Dockerfile .
+	docker push localhost:5000/rusk_web:latest
 	# --progress plain
-	@echo "web server built successfully!"
-	@echo "run 'docker run -it -p 8080:5056 rust_web:latest' to start the server"
+	@echo "Rusk web server built successfully!"
+	@echo "run 'docker run -it -p 8080:5056 rusk_web:latest' to start the server"
+
+deploy_web: build_web deploy_common
+	kubectl apply -f k8s/rusk_web.yaml
+	@echo "web server deployed successfully!"
+	@echo "Since we are using Docker Desktop with Minikube, execute below command in a SEPARATE terminal and then access the web server"
+	@echo "minikube service rusk-web-service --url --namespace rusk"
+	@echo "Use URL given by the above command to curl the web server"
+	@echo "REFERENCE: https://kubernetes.io/docs/tutorials/kubernetes-basics/expose/expose-intro/"
 
 run_content_repo: test
 	@echo $$CONFIG_FILE_PATH

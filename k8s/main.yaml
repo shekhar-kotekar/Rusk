@@ -19,7 +19,7 @@ spec:
       - name: rusk-main
         image: localhost:5000/rusk_main:latest
         ports:
-        - containerPort: 5057
+        - containerPort: 5055
           name: rusk-main-svc
         resources:
           requests:
@@ -37,7 +37,7 @@ metadata:
 spec:
   ports:
   - protocol: TCP
-    port: 5057
+    port: 5055
     targetPort: rusk-main-svc
   selector:
     app: ruks-main

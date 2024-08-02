@@ -2,6 +2,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use tokio::signal;
 
 const SERVER_PORT: &str = "5056";
 
@@ -22,7 +23,38 @@ async fn main() {
     tracing::info!("Starting rusk web server on {}", server_address);
 
     let listener = tokio::net::TcpListener::bind(server_address).await.unwrap();
-    axum::serve(listener, server).await.unwrap();
+    axum::serve(listener, server)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received Ctrl-C signal, shutting down...");
+        },
+        _ = terminate => {
+            tracing::info!("Received terminate signal, shutting down...");
+        },
+    }
 }
 
 async fn health_check() -> &'static str {
