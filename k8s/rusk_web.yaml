@@ -44,8 +44,7 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 5056
-    # targetPort: rusk-web-svc
+    targetPort: rusk-web-svc
     nodePort: 30001
   selector:
     app: rusk-web

@@ -12,13 +12,13 @@ async fn main() {
     let server_address = format!("0.0.0.0:{}", SERVER_PORT);
     let server = Router::new()
         .route("/health_check", get(health_check))
-        .route("/create_processor", post(create_processor))
-        .route("/delete_processor", post(delete_processor))
-        .route("/stop_processor", post(stop_processor))
-        .route("/start_processor", post(start_processor))
-        .route("/get_processor_status", get(get_processor_status))
-        .route("/connect_processors", post(connect_processors))
-        .route("/disconnect_processors", post(disconnect_processors));
+        .route("/processor/create", post(create_processor))
+        .route("/processor/delete", post(delete_processor))
+        .route("/processor/stop", post(stop_processor))
+        .route("/processor/start", post(start_processor))
+        .route("/processor/get_status", get(get_processor_status))
+        .route("/processor/connect", post(connect_processors))
+        .route("/processor/disconnect", post(disconnect_processors));
 
     tracing::info!("Starting rusk web server on {}", server_address);
 
