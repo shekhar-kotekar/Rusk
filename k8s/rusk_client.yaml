@@ -18,6 +18,9 @@ spec:
       containers:
       - name: rusk-client
         image: localhost:5000/rusk_client:latest
+        env:
+        - name: CONTENT_REPOSITORY_SERVICE
+          value: content-repository-service
         ports:
         - containerPort: 80
         resources:

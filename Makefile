@@ -71,6 +71,7 @@ deploy_all: build_all
 delete_all:
 	kubectl delete -f k8s/content_repository.yaml
 	kubectl delete -f k8s/main.yaml
+	kubectl delete -f k8s/rusk_client.yaml
 	kubectl delete -f k8s/common.yaml
 	@echo "All deployments deleted successfully!"
 

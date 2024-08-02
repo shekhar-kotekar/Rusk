@@ -20,6 +20,7 @@ spec:
         image: localhost:5000/rusk_main:latest
         ports:
         - containerPort: 5057
+          name: rusk-main-svc
         resources:
           requests:
             memory: "32Mi"
@@ -27,3 +28,17 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rusk-main-service
+  namespace: rusk
+spec:
+  ports:
+  - protocol: TCP
+    port: 5057
+    targetPort: rusk-main-svc
+  selector:
+    app: ruks-main
+  type: ClusterIP

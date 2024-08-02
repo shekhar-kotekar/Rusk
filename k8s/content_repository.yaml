@@ -20,6 +20,7 @@ spec:
         image: localhost:5000/rusk_content_repo:latest
         ports:
         - containerPort: 5056
+          name: content-repository-svc
         resources:
           requests:
             memory: "32Mi"
@@ -32,11 +33,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: content-repository-service
+  namespace: rusk
 spec:
   ports:
   - protocol: TCP
     port: 5056
-    targetPort: 5056
+    targetPort: content-repository-svc
   selector:
     app: content-repository
-  type: NodePort
+  type: ClusterIP
