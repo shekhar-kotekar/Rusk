@@ -40,7 +40,6 @@ metadata:
   name: rusk-web-service
   namespace: rusk
 spec:
-  type: NodePort
   ports:
   - protocol: TCP
     port: 8080
@@ -48,3 +47,4 @@ spec:
     nodePort: 30000
   selector:
     app: rusk-web
+  type: NodePort

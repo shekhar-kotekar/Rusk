@@ -38,7 +38,6 @@ metadata:
   name: rusk-client-service
   namespace: rusk
 spec:
-  type: NodePort
   ports:
   - protocol: TCP
     port: 8080
@@ -46,3 +45,4 @@ spec:
     nodePort: 30001
   selector:
     app: rusk-client
+  type: NodePort
