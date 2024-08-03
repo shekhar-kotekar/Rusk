@@ -1,8 +1,10 @@
 use axum::{
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
+use http::{header, Method};
 use tokio::signal;
+use tower_http::cors::{Any, CorsLayer};
 
 const SERVER_PORT: &str = "5056";
 
@@ -10,15 +12,23 @@ const SERVER_PORT: &str = "5056";
 async fn main() {
     commons::enable_tracing();
     let server_address = format!("0.0.0.0:{}", SERVER_PORT);
+
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::DELETE])
+        .allow_headers([header::CONTENT_TYPE])
+        .allow_origin(Any);
+
     let server = Router::new()
-        .route("/health_check", get(health_check))
+        .route("/is_alive", get(health_check))
         .route("/processor/create", post(create_processor))
-        .route("/processor/delete", post(delete_processor))
+        .route("/processor/delete", delete(delete_processor))
         .route("/processor/stop", post(stop_processor))
         .route("/processor/start", post(start_processor))
         .route("/processor/get_status", get(get_processor_status))
+        .route("/processor/get_properties", get(get_processor_properties))
         .route("/processor/connect", post(connect_processors))
-        .route("/processor/disconnect", post(disconnect_processors));
+        .route("/processor/disconnect", post(disconnect_processors))
+        .layer(cors);
 
     tracing::info!("Starting rusk web server on {}", server_address);
 
@@ -79,6 +89,10 @@ async fn start_processor() -> &'static str {
 
 async fn get_processor_status() -> &'static str {
     "NOT IMPLEMENTED YET!"
+}
+
+async fn get_processor_properties() -> &'static str {
+    "get processor properties"
 }
 
 async fn connect_processors() -> &'static str {

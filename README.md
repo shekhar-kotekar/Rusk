@@ -36,15 +36,6 @@ Execute `make build_web` command build Docker image
 - To add a new library package, Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
 - To run an individual package within a workspace, execute `cargo run -p <MODULE NAME>`. Example : `cargo run -p rusk_web`
 
-## Plan
-- [x] Create simplest possible processor
-- [x] Write code with unit tests to verify if a processor can send message to other
-- [x] Create simplest possible data structure which will hold processors and connection between them
-- [x] Understand how content repository works (Flowfile does not store payload/content within itself, it keeps a pointer to content repository)
-- [ ] Implement content repository
-- [ ] Use content repository to implement flow file
-- [ ] Use Flow file to implement simplest "echo" processor (without attributes)
-
 ## Content Repository
 For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.
 

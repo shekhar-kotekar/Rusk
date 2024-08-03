@@ -3,8 +3,8 @@ export CONFIG_FILE_PATH := config.toml
 .PHONY: prepare test run release build_web
 
 prepare:
-	kubectl config use-context minikube
 	cargo fmt && cargo clippy && cargo check
+	kubectl config use-context minikube
 
 test: prepare
 	RUST_LOG=debug cargo test
@@ -16,18 +16,30 @@ release: test
 	cargo build --release
 
 deploy_common:
+	@echo
 	@echo "INFO: Make sure you have enabled minikube registry AND started alpine container as mentioned in README.md"
+	kubectl config use-context minikube
 	kubectl apply -f k8s/common.yaml
+	@echo
 
 deploy_client: deploy_common
+	@echo
 	@echo "INFO: Make sure you have enabled minikube registry AND started alpine container as mentioned in README.md"
 	@echo "WARNING: Make sure you have built the client image using 'make build_client' from rusk_client project"
-	
+	@echo
+
 	docker push localhost:5000/rusk_client:latest
-	@echo "Client pushed to minikube local registry"
+	@echo
+	@echo "INFO: Client pushed to minikube local registry"
+	@echo
 
 	kubectl apply -f k8s/rusk_client.yaml
-	@echo "Client is running on http://localhost:8080"
+	
+	@echo
+	@echo "INFO : Since we are using Docker Desktop with Minikube, execute below command in a SEPARATE terminal and then access the web server"
+	@echo "minikube service rusk-client-service --url --namespace rusk"
+	@echo "Use URL given by the above command to curl the client OR open URL in browser"
+	@echo "REFERENCE: https://kubernetes.io/docs/tutorials/kubernetes-basics/expose/expose-intro/"
 
 build_web: prepare
 	docker build --tag localhost:5000/rusk_web:latest -f rusk_web/Dockerfile .
@@ -39,6 +51,7 @@ build_web: prepare
 deploy_web: build_web deploy_common
 	kubectl apply -f k8s/rusk_web.yaml
 	@echo "web server deployed successfully!"
+	@echo
 	@echo "Since we are using Docker Desktop with Minikube, execute below command in a SEPARATE terminal and then access the web server"
 	@echo "minikube service rusk-web-service --url --namespace rusk"
 	@echo "Use URL given by the above command to curl the web server"

@@ -13,8 +13,6 @@ RUN echo $(ls -ltrh /${module_name})
 RUN cargo test --package ${module_name} && \
     cargo build --package ${module_name} --release
 
-RUN echo $(ls -ltrh /${module_name}/target/release/)
-
 FROM scratch
 ARG module_name=rusk_web
 COPY --from=builder /${module_name}/target/release/${module_name} /${module_name}

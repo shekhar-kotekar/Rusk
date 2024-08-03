@@ -23,6 +23,7 @@ spec:
           value: content-repository-service
         ports:
         - containerPort: 80
+          name: rusk-client-svc
         resources:
           requests:
             memory: "32Mi"
@@ -30,3 +31,18 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rusk-client-service
+  namespace: rusk
+spec:
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: rusk-client-svc
+    nodePort: 30002
+  selector:
+    app: rusk-client
