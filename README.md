@@ -11,21 +11,8 @@ NiFi equivalent built using Rust. Architecture diagram and other high level deta
 We use Minikube to check modules in local so make sure that Minikube is installed and "registry" addon is enabled.
 Execute below commands to enable and start local image registry:
 ```
-# make sure that current context is set to minikube
+# make sure that current context is set to kind-kind
 kubectl config current-context
-
-# start minikube with registry
-minikube start
-minikube addons enable registry
-
-# this command runs docker container in interactive mode so open another terminal
-docker run --rm -it --network=host alpine ash -c "apk add socat && socat TCP-LISTEN:5000,reuseaddr,fork TCP:$(minikube ip):5000"
-```
-
-Once local image registry is enabled and started tag docker image and push using below commands:
-```
-docker tag rusk_content_repo localhost:5000/rusk_content_repo:latest
-docker push localhost:5000/rusk_content_repo:latest
 ```
 
 ## Rusk Web module
@@ -33,8 +20,9 @@ Accepts requests from UI and takes actions like adding a processor, connecting 2
 Execute `make build_web` command build Docker image
 
 ## Useful commands:
-- To add a new library package, Execute `cargo new --lib <PACKAGE_NAME> --vcs none`
+- To add a new library package, execute `cargo new --lib <PACKAGE_NAME> --vcs none`
 - To run an individual package within a workspace, execute `cargo run -p <MODULE NAME>`. Example : `cargo run -p rusk_web`
+- To Execute unit test for a particular module, execute `cargo test --package <module name>`. Example : `cargo test --package rusk_web`
 
 ## Content Repository
 For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.

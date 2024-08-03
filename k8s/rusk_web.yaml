@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: rusk-web
-        image: localhost:5000/rusk_web:latest
+        image: localhost:5001/rusk_web:latest
         env:
         - name: MAIN_SERVICE
           value: rusk-main-service
@@ -43,8 +43,8 @@ spec:
   type: NodePort
   ports:
   - protocol: TCP
-    port: 80
+    port: 8080
     targetPort: rusk-web-svc
-    nodePort: 30001
+    nodePort: 30000
   selector:
     app: rusk-web

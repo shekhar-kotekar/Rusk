@@ -19,13 +19,13 @@ async fn main() {
         .allow_origin(Any);
 
     let server = Router::new()
-        .route("/is_alive", get(health_check))
+        .route("/is_alive", get(is_alive))
         .route("/processor/create", post(create_processor))
         .route("/processor/delete", delete(delete_processor))
         .route("/processor/stop", post(stop_processor))
         .route("/processor/start", post(start_processor))
         .route("/processor/get_status", get(get_processor_status))
-        .route("/processor/get_properties", get(get_processor_properties))
+        .route("/processor/get_info", get(get_processor_info))
         .route("/processor/connect", post(connect_processors))
         .route("/processor/disconnect", post(disconnect_processors))
         .layer(cors);
@@ -67,7 +67,7 @@ async fn shutdown_signal() {
     }
 }
 
-async fn health_check() -> &'static str {
+async fn is_alive() -> &'static str {
     "Alive"
 }
 
@@ -91,8 +91,8 @@ async fn get_processor_status() -> &'static str {
     "NOT IMPLEMENTED YET!"
 }
 
-async fn get_processor_properties() -> &'static str {
-    "get processor properties"
+async fn get_processor_info() -> &'static str {
+    "get processor info"
 }
 
 async fn connect_processors() -> &'static str {
@@ -109,11 +109,21 @@ mod rusk_web_server_tests {
     use axum_test::TestServer;
 
     #[tokio::test]
-    async fn test_health_check() {
-        let app = Router::new().route("/health_check", get(super::health_check));
+    async fn test_is_alive() {
+        let app = Router::new().route("/is_alive", get(super::is_alive));
         let test_server = TestServer::new(app).unwrap();
-        let response = test_server.get("/health_check").await;
+        let response = test_server.get("/is_alive").await;
         response.assert_status_ok();
         response.assert_text("Alive");
+    }
+
+    #[tokio::test]
+    async fn test_get_processor_info() {
+        let route = "/processor/get_info";
+        let app = Router::new().route(&route, get(super::get_processor_info));
+        let test_server = TestServer::new(app).unwrap();
+        let response = test_server.get(&route).await;
+        response.assert_status_ok();
+        response.assert_text("get processor info");
     }
 }

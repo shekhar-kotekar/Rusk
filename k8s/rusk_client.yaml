@@ -17,12 +17,12 @@ spec:
     spec:
       containers:
       - name: rusk-client
-        image: localhost:5000/rusk_client:latest
+        image: localhost:5001/rusk_client:latest
         env:
         - name: CONTENT_REPOSITORY_SERVICE
           value: content-repository-service
         ports:
-        - containerPort: 80
+        - containerPort: 8080
           name: rusk-client-svc
         resources:
           requests:
@@ -41,8 +41,8 @@ spec:
   type: NodePort
   ports:
   - protocol: TCP
-    port: 80
+    port: 8080
     targetPort: rusk-client-svc
-    nodePort: 30002
+    nodePort: 30001
   selector:
     app: rusk-client
