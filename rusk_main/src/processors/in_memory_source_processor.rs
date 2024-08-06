@@ -58,10 +58,10 @@ impl InMemorySourceProcessor {
                         match result {
                             Ok(ProcessorCommand::Pause) => {
                                 self.status = ProcessorStatus::Paused;
-                                tracing::info!("{}: Paused", self.processor_name);
+                                tracing::info!("{}: Paused.", self.processor_name);
                             }
-                            Ok(ProcessorCommand::Shutdown) => {
-                                tracing::info!("{}: Shutting down", self.processor_name);
+                            Ok(ProcessorCommand::Stop) => {
+                                tracing::info!("{}: Shutting down.", self.processor_name);
                                 break;
                             }
                             _ => {}
@@ -82,7 +82,7 @@ impl InMemorySourceProcessor {
                             self.status = ProcessorStatus::Running;
                             tracing::info!("{}: Resumed", self.processor_name);
                         }
-                        Some(ProcessorCommand::Shutdown) => {
+                        Some(ProcessorCommand::Stop) => {
                             tracing::info!("{}: Shutting down", self.processor_name);
                             break;
                         }
@@ -100,7 +100,7 @@ impl InMemorySourceProcessor {
                             self.status = ProcessorStatus::Running;
                             tracing::info!("{}: Started", self.processor_name);
                         }
-                        Some(ProcessorCommand::Shutdown) => {
+                        Some(ProcessorCommand::Stop) => {
                             tracing::info!("{}: Shutting down", self.processor_name);
                             break;
                         }

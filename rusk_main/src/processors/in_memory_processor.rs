@@ -58,7 +58,7 @@ impl InMemoryProcessor {
                                 }
                             }
                         }
-                        Some(ProcessorCommand::Shutdown) => {
+                        Some(ProcessorCommand::Stop) => {
                             tracing::info!("{}: Shutting down", self.processor_name);
                             break;
                         }
@@ -78,7 +78,7 @@ impl InMemoryProcessor {
                             self.status = ProcessorStatus::Running;
                             tracing::info!("{}: Resumed", self.processor_name);
                         }
-                        Some(ProcessorCommand::Shutdown) => {
+                        Some(ProcessorCommand::Stop) => {
                             tracing::info!("{}: Shutting down", self.processor_name);
                             break;
                         }
@@ -96,7 +96,7 @@ impl InMemoryProcessor {
                             self.status = ProcessorStatus::Running;
                             tracing::info!("{}: Started", self.processor_name);
                         }
-                        Some(ProcessorCommand::Shutdown) => {
+                        Some(ProcessorCommand::Stop) => {
                             tracing::info!("{}: Shutting down", self.processor_name);
                             break;
                         }
