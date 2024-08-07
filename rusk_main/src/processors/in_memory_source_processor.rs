@@ -46,7 +46,7 @@ impl InMemorySourceProcessor {
                             "{}: No processors to send packet to. Pausing.",
                             self.processor_name
                         );
-                        self.status = ProcessorStatus::Paused;
+                        self.status = ProcessorStatus::Stopped;
                     } else {
                         let packet = generate_packet_func();
                         for tx in &self.tx {
@@ -56,12 +56,8 @@ impl InMemorySourceProcessor {
                         }
                         let result = self.rx.try_recv();
                         match result {
-                            Ok(ProcessorCommand::Pause) => {
-                                self.status = ProcessorStatus::Paused;
-                                tracing::info!("{}: Paused.", self.processor_name);
-                            }
                             Ok(ProcessorCommand::Stop) => {
-                                tracing::info!("{}: Shutting down.", self.processor_name);
+                                tracing::info!("{} : processor stopped.", self.processor_name);
                                 break;
                             }
                             _ => {}
@@ -75,20 +71,6 @@ impl InMemorySourceProcessor {
                         sleep(Duration::from_millis(self.delay)).await;
                     }
                 }
-                ProcessorStatus::Paused => {
-                    let result = self.rx.recv().await;
-                    match result {
-                        Some(ProcessorCommand::Resume) => {
-                            self.status = ProcessorStatus::Running;
-                            tracing::info!("{}: Resumed", self.processor_name);
-                        }
-                        Some(ProcessorCommand::Stop) => {
-                            tracing::info!("{}: Shutting down", self.processor_name);
-                            break;
-                        }
-                        _ => {}
-                    }
-                }
                 ProcessorStatus::Stopped => {
                     tracing::info!(
                         "{} processor is Stopped. Waiting for command on rx channel.",
@@ -99,10 +81,6 @@ impl InMemorySourceProcessor {
                         Some(ProcessorCommand::Start) => {
                             self.status = ProcessorStatus::Running;
                             tracing::info!("{}: Started", self.processor_name);
-                        }
-                        Some(ProcessorCommand::Stop) => {
-                            tracing::info!("{}: Shutting down", self.processor_name);
-                            break;
                         }
                         _ => {}
                     }

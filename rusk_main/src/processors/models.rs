@@ -2,7 +2,6 @@ use uuid::Uuid;
 
 #[derive(Copy, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ProcessorStatus {
-    Paused,
     Running,
     Stopped,
 }
@@ -12,7 +11,6 @@ impl PartialEq for ProcessorStatus {
         match (self, other) {
             (ProcessorStatus::Running, ProcessorStatus::Running) => true,
             (ProcessorStatus::Stopped, ProcessorStatus::Stopped) => true,
-            (ProcessorStatus::Paused, ProcessorStatus::Paused) => true,
             _ => false,
         }
     }
@@ -21,8 +19,6 @@ impl PartialEq for ProcessorStatus {
 #[derive(Clone, Debug)]
 pub enum ProcessorCommand {
     Stop,
-    Pause,
-    Resume,
     Start,
     InMemoryMessage(InMemoryPacket),
     ReferenceMessage(ReferencePacket),
