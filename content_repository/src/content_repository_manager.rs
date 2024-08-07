@@ -6,13 +6,12 @@ use tokio::{
 
 pub async fn init(config: ContentRepositoryConfig) -> File {
     tracing::info!("Initializing content repository");
-    std::fs::create_dir_all(&config.base_path).expect(
-        format!(
+    std::fs::create_dir_all(&config.base_path).unwrap_or_else(|_| {
+        panic!(
             "Failed to create content repository directory: {}",
             config.base_path
         )
-        .as_str(),
-    );
+    });
     tracing::info!("Content repository directory created: {}", config.base_path);
     let file_path = format!("{}/{}.txt", config.base_path, config.file_name_prefix);
     OpenOptions::new()
