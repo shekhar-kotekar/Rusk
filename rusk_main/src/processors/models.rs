@@ -8,11 +8,11 @@ pub enum ProcessorStatus {
 
 impl PartialEq for ProcessorStatus {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ProcessorStatus::Running, ProcessorStatus::Running) => true,
-            (ProcessorStatus::Stopped, ProcessorStatus::Stopped) => true,
-            _ => false,
-        }
+        matches!(
+            (self, other),
+            (ProcessorStatus::Running, ProcessorStatus::Running)
+                | (ProcessorStatus::Stopped, ProcessorStatus::Stopped)
+        )
     }
 }
 

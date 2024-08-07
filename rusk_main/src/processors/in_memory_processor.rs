@@ -73,12 +73,9 @@ impl InMemoryProcessor {
                         self.processor_name
                     );
                     let result = self.rx.recv().await;
-                    match result {
-                        Some(ProcessorCommand::Start) => {
-                            self.status = ProcessorStatus::Running;
-                            tracing::info!("{}: Started", self.processor_name);
-                        }
-                        _ => {}
+                    if let Some(ProcessorCommand::Start) = result {
+                        self.status = ProcessorStatus::Running;
+                        tracing::info!("{}: Started", self.processor_name);
                     }
                 }
             }

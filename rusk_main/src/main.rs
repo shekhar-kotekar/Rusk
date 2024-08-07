@@ -130,16 +130,16 @@ fn adder_func() -> InMemoryPacket {
     }
 }
 
-fn doubler_func(packet: InMemoryPacket) -> Option<InMemoryPacket> {
-    let new_data = packet.data.iter().map(|x| x * 2).collect();
-    let new_packet = InMemoryPacket {
-        id: packet.id,
-        data: new_data,
-    };
-    tracing::info!(
-        "old data: {:?}, new data: {:?}",
-        packet.data,
-        new_packet.data
-    );
-    Some(new_packet)
-}
+// fn doubler_func(packet: InMemoryPacket) -> Option<InMemoryPacket> {
+//     let new_data = packet.data.iter().map(|x| x * 2).collect();
+//     let new_packet = InMemoryPacket {
+//         id: packet.id,
+//         data: new_data,
+//     };
+//     tracing::info!(
+//         "old data: {:?}, new data: {:?}",
+//         packet.data,
+//         new_packet.data
+//     );
+//     Some(new_packet)
+// }

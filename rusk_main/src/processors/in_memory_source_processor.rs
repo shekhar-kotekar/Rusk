@@ -55,12 +55,9 @@ impl InMemorySourceProcessor {
                                 .await;
                         }
                         let result = self.rx.try_recv();
-                        match result {
-                            Ok(ProcessorCommand::Stop) => {
-                                tracing::info!("{} : processor stopped.", self.processor_name);
-                                break;
-                            }
-                            _ => {}
+                        if let Ok(ProcessorCommand::Stop) = result {
+                            tracing::info!("{} : processor stopped.", self.processor_name);
+                            break;
                         }
                         tracing::info!(
                             "{}: packet sent to {} processors. Sleeping for {} ms.",
@@ -77,12 +74,9 @@ impl InMemorySourceProcessor {
                         self.processor_name
                     );
                     let result = self.rx.recv().await;
-                    match result {
-                        Some(ProcessorCommand::Start) => {
-                            self.status = ProcessorStatus::Running;
-                            tracing::info!("{}: Started", self.processor_name);
-                        }
-                        _ => {}
+                    if let Some(ProcessorCommand::Start) = result {
+                        self.status = ProcessorStatus::Running;
+                        tracing::info!("{}: Started", self.processor_name);
                     }
                 }
             }
