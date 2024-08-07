@@ -7,6 +7,3 @@ base_path = "/tmp/rusk/content_repository"
 file_name_prefix = "wal"
 server_port = 5056
 queue_size = 1000
-
-[web_server]
-server_port = 80

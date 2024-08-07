@@ -41,6 +41,7 @@ pub struct ContentRepositoryConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct MainConfig {
     pub processor_queue_length: usize,
+    pub server_port: u16,
 }
 
 #[derive(Debug, Deserialize)]

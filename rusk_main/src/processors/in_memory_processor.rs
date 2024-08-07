@@ -58,31 +58,13 @@ impl InMemoryProcessor {
                                 }
                             }
                         }
-                        Some(ProcessorCommand::Shutdown) => {
-                            tracing::info!("{}: Shutting down", self.processor_name);
+                        Some(ProcessorCommand::Stop) => {
+                            tracing::info!("{} : processor stopped.", self.processor_name);
                             break;
-                        }
-                        Some(ProcessorCommand::Pause) => {
-                            tracing::info!("{}: Pausing", self.processor_name);
-                            self.status = ProcessorStatus::Paused;
                         }
                         _ => {
                             // write code to send error to error channel
                         }
-                    }
-                }
-                ProcessorStatus::Paused => {
-                    let result = self.rx.recv().await;
-                    match result {
-                        Some(ProcessorCommand::Resume) => {
-                            self.status = ProcessorStatus::Running;
-                            tracing::info!("{}: Resumed", self.processor_name);
-                        }
-                        Some(ProcessorCommand::Shutdown) => {
-                            tracing::info!("{}: Shutting down", self.processor_name);
-                            break;
-                        }
-                        _ => {}
                     }
                 }
                 ProcessorStatus::Stopped => {
@@ -91,16 +73,9 @@ impl InMemoryProcessor {
                         self.processor_name
                     );
                     let result = self.rx.recv().await;
-                    match result {
-                        Some(ProcessorCommand::Start) => {
-                            self.status = ProcessorStatus::Running;
-                            tracing::info!("{}: Started", self.processor_name);
-                        }
-                        Some(ProcessorCommand::Shutdown) => {
-                            tracing::info!("{}: Shutting down", self.processor_name);
-                            break;
-                        }
-                        _ => {}
+                    if let Some(ProcessorCommand::Start) = result {
+                        self.status = ProcessorStatus::Running;
+                        tracing::info!("{}: Started", self.processor_name);
                     }
                 }
             }

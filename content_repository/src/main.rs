@@ -131,12 +131,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use commons::ContentRepositoryConfig;
-    use tempfile::tempdir;
     use tokio::{io::AsyncWriteExt, net::TcpStream};
 
     use super::*;
-    use std::{fs::File as StdFile, io::Read};
 
     #[tokio::test]
     async fn test_accept_client_connections() {
