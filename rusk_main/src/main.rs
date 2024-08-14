@@ -66,7 +66,7 @@ async fn main() {
 
     let server_address = format!("0.0.0.0:{}", main_config.server_port);
 
-    tracing::info!("Starting rusk web server on {}", server_address);
+    tracing::info!("Starting rusk server on {}", server_address);
 
     let listener = tokio::net::TcpListener::bind(server_address).await.unwrap();
 
