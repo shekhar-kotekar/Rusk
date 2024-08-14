@@ -1,7 +1,7 @@
 use crate::processors::models::ProcessorStatus;
 
 use super::{
-    base_processor::SinkProcessor,
+    base_processor::{ProcessorConnection, SinkProcessor},
     models::{InMemoryPacket, Message, ProcessorCommand},
 };
 use std::collections::HashMap;
@@ -35,6 +35,16 @@ impl SinkProcessor for InMemoryProcessor {
             peers_tx: HashMap::new(),
             cancellation_token,
         }
+    }
+}
+
+impl ProcessorConnection for InMemoryProcessor {
+    fn connect_processor(&mut self, receiver_processor_id: Uuid, tx: mpsc::Sender<Message>) {
+        self.peers_tx.insert(receiver_processor_id, tx);
+    }
+
+    fn disconnect_processor(&mut self, receiver_processor_id: Uuid) {
+        self.peers_tx.remove(&receiver_processor_id);
     }
 }
 
@@ -76,7 +86,8 @@ impl InMemoryProcessor {
                                     }
                                 }
                                 None => {
-                                    // write code to send error to error channel
+                                    tracing::error!(
+                                        "{}: Error processing packet", self.processor_name);
                                 }
                             }
                         }

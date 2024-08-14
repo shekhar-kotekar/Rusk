@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::processors::models::{Message, ProcessorStatus};
 
 use super::{
-    base_processor::SourceProcessor,
+    base_processor::{ProcessorConnection, SourceProcessor},
     models::{InMemoryPacket, ProcessorCommand},
 };
 use tokio::sync::mpsc;
@@ -13,7 +15,7 @@ pub struct InMemorySourceProcessor {
     pub processor_id: Uuid,
     pub status: super::models::ProcessorStatus,
     parent_rx: mpsc::Receiver<ProcessorCommand>,
-    peers_tx: Vec<mpsc::Sender<Message>>,
+    peers_tx: HashMap<Uuid, mpsc::Sender<Message>>,
     cancellation_token: CancellationToken,
 }
 
@@ -21,7 +23,7 @@ impl SourceProcessor for InMemorySourceProcessor {
     fn new(
         processor_name: String,
         parent_rx: mpsc::Receiver<ProcessorCommand>,
-        peer_processors_tx: Vec<mpsc::Sender<Message>>,
+        peer_processors_tx: HashMap<Uuid, mpsc::Sender<Message>>,
         cancellation_token: CancellationToken,
     ) -> Self {
         InMemorySourceProcessor {
@@ -32,6 +34,20 @@ impl SourceProcessor for InMemorySourceProcessor {
             peers_tx: peer_processors_tx,
             cancellation_token,
         }
+    }
+}
+
+impl ProcessorConnection for InMemorySourceProcessor {
+    fn disconnect_processor(&mut self, receiver_processor_id: Uuid) {
+        self.peers_tx.remove(&receiver_processor_id);
+    }
+
+    fn connect_processor(
+        &mut self,
+        receiver_processor_id: Uuid,
+        tx_for_receiver: mpsc::Sender<Message>,
+    ) {
+        self.peers_tx.insert(receiver_processor_id, tx_for_receiver);
     }
 }
 
@@ -62,7 +78,7 @@ impl InMemorySourceProcessor {
                 else => {
                     if self.status == ProcessorStatus::Running {
                         if let Some(packet) = generate_packet_func() {
-                            for tx in self.peers_tx.iter() {
+                            for tx in self.peers_tx.values() {
                                 tx.send(Message::InMemoryMessage(packet.clone())).await.unwrap();
                             }
                         }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     adder_func,
     processors::{
@@ -42,7 +44,7 @@ pub async fn create_processor(
     let mut processor = InMemorySourceProcessor::new(
         payload.processor_name,
         processor_to_parent_rx,
-        Vec::new(),
+        HashMap::new(),
         server_state.cancellation_token.clone(),
     );
 
