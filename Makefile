@@ -29,7 +29,7 @@ deploy_client: deploy_common
 	@echo
 	docker push ${IMAGE_REGISTRY}/rusk_client:latest
 	@echo
-	@echo "INFO: Client pushed to ${IMAGE_REGISTRY} registry"
+	@echo "INFO: Client pushed to ${IMAGE_REGISTRY} registry."
 	@echo
 	kubectl apply -f k8s/rusk_client.yaml
 	@echo "Client deployed successfully! Access the client using http://localhost:8080 URL in browser."
