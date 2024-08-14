@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: content-repository
+  name: rusk-main
   namespace: rusk
   labels:
-    app: content-repository
+    app: rusk-main
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: content-repository
+      app: rusk-main
   template:
     metadata:
       labels:
-        app: content-repository
+        app: rusk-main
     spec:
       containers:
-      - name: content-repository
-        image: localhost:5000/rusk_content_repo:latest
+      - name: rusk-main
+        image: localhost:5001/rusk_main:latest
         ports:
-        - containerPort: 5056
-          name: content-repository-svc
+        - containerPort: 5055
+          name: rusk-main-svc
         resources:
           requests:
             memory: "32Mi"
@@ -32,13 +32,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: content-repository-service
+  name: rusk-main-service
   namespace: rusk
 spec:
   ports:
   - protocol: TCP
-    port: 5056
-    targetPort: content-repository-svc
+    port: 5055
+    targetPort: rusk-main-svc
   selector:
-    app: content-repository
+    app: rusk-main
   type: ClusterIP

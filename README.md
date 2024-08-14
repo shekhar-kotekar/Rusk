@@ -8,12 +8,8 @@ NiFi equivalent built using Rust. Architecture diagram and other high level deta
 - Execute `make release` to create a release mode version of the project 
 
 ### Local development
-We use Minikube to check modules in local so make sure that Minikube is installed and "registry" addon is enabled.
-Execute below commands to enable and start local image registry:
-```
-# make sure that current context is set to kind-kind
-kubectl config current-context
-```
+#### Local testing
+Execute `make build PACKAGE=<package name without rust_prefix>` command. For example, to build `rusk_main` package, execute `make build PACKAGE=main`. Similarly we can execute `make deploy` command to build and deploy image in local `kind` based cluster.
 
 ## Rusk Web module
 Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
