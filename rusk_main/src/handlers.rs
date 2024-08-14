@@ -219,6 +219,68 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_processor_status() {
+        let create_processor_route = "/create_processor";
+        let start_processor_route = "/start_processor";
+        let stop_processor_route = "/stop_processor";
+        let get_status_route = "/get_status";
+
+        let config: MainConfig = MainConfig {
+            server_port: 8080,
+            processor_queue_length: 10,
+        };
+
+        let cancellation_token = CancellationToken::new();
+        let state = super::AppState {
+            config,
+            cancellation_token: cancellation_token.clone(),
+            peers_tx: Arc::new(Mutex::new(HashMap::new())),
+        };
+
+        let app = Router::new()
+            .route(&create_processor_route, post(super::create_processor))
+            .route(&start_processor_route, post(super::start_processor))
+            .route(&stop_processor_route, post(super::stop_processor))
+            .route(&get_status_route, get(super::get_status))
+            .with_state(state);
+
+        let test_server = TestServer::new(app).unwrap();
+
+        let create_processor_response = test_server
+            .post(create_processor_route)
+            .json(&json!(RequestDetails {
+                processor_name: "adder_processor".to_string(),
+                processor_id: None,
+            }))
+            .await;
+        create_processor_response.assert_status_ok();
+        let response_details = create_processor_response.json::<ResponseDetails>();
+        assert_eq!(response_details.status, super::ProcessorStatus::Stopped);
+
+        let request_body: RequestDetails = RequestDetails {
+            processor_name: "adder_processor".to_string(),
+            processor_id: Some(response_details.processor_id),
+        };
+        let get_status_response = test_server
+            .get(get_status_route)
+            .json(&json!(request_body))
+            .await;
+        get_status_response.assert_status_ok();
+        let response_details = get_status_response.json::<ResponseDetails>();
+        assert_eq!(response_details.status, super::ProcessorStatus::Running);
+
+        let stop_processor_response = test_server
+            .post(stop_processor_route)
+            .json(&json!(request_body))
+            .await;
+        stop_processor_response.assert_status_ok();
+        let response_details = stop_processor_response.json::<ResponseDetails>();
+        assert_eq!(response_details.status, super::ProcessorStatus::Stopped);
+
+        cancellation_token.cancel();
+    }
+
+    #[tokio::test]
     async fn test_stop_processor() {
         let create_processor_route = "/create_processor";
         let start_processor_route = "/start_processor";
