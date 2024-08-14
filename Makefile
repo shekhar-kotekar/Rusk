@@ -6,6 +6,12 @@ k8s_context := kind-kind
 .PHONY: prepare test run release build_web
 
 prepare:
+	@if [ -z "$(PACKAGE)" ]; then \
+        echo "Error: PACKAGE variable is not set"; \
+        exit 1; \
+    fi
+	@echo "Preparing $(PACKAGE) package"
+
 	cargo fmt && cargo clippy && cargo check
 	kubectl config use-context ${k8s_context}
 

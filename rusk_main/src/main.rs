@@ -29,8 +29,8 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    //commons::enable_tracing();
-    console_subscriber::init();
+    commons::enable_tracing();
+    //console_subscriber::init();
 
     let main_config: MainConfig = commons::get_config().rusk_main;
     let cancellation_token = CancellationToken::new();
