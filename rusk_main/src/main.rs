@@ -24,19 +24,20 @@ mod processors;
 struct AppState {
     config: MainConfig,
     cancellation_token: CancellationToken,
-    processor_senders: Arc<Mutex<HashMap<Uuid, mpsc::Sender<ProcessorCommand>>>>,
+    peers_tx: Arc<Mutex<HashMap<Uuid, mpsc::Sender<ProcessorCommand>>>>,
 }
 
 #[tokio::main]
 async fn main() {
-    commons::enable_tracing();
+    //commons::enable_tracing();
+    console_subscriber::init();
 
     let main_config: MainConfig = commons::get_config().rusk_main;
     let cancellation_token = CancellationToken::new();
     let state = AppState {
         config: main_config.clone(),
         cancellation_token: cancellation_token.clone(),
-        processor_senders: Arc::new(Mutex::new(HashMap::new())),
+        peers_tx: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let cors = CorsLayer::new()
@@ -51,7 +52,7 @@ async fn main() {
         .route("/processor/stop", post(handlers::stop_processor))
         .route("/processor/start", post(handlers::start_processor))
         .route("/processor/create", post(handlers::create_processor))
-        .route("/processor/get_status", get(handlers::get_processor_status))
+        .route("/processor/get_status", get(handlers::get_status))
         .route("/processor/get_info", get(handlers::get_processor_info))
         .route("/processor/connect", post(handlers::connect_processors))
         .route(
@@ -121,13 +122,13 @@ async fn shutdown_signal(cancellation_token: CancellationToken) {
     }
 }
 
-fn adder_func() -> InMemoryPacket {
+fn adder_func() -> Option<InMemoryPacket> {
     let mut rng = rand::thread_rng();
     let data: Vec<u8> = (0..3).map(|_| rng.gen_range(1..100)).collect();
-    InMemoryPacket {
+    Some(InMemoryPacket {
         id: Uuid::new_v4(),
         data,
-    }
+    })
 }
 
 // fn doubler_func(packet: InMemoryPacket) -> Option<InMemoryPacket> {

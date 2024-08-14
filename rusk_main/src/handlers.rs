@@ -1,7 +1,9 @@
+use std::ops::Deref;
+
 use crate::{
     adder_func,
     processors::{
-        base_processor::Processor,
+        base_processor::ProcessorV2,
         in_memory_source_processor::InMemorySourceProcessor,
         models::{ProcessorCommand, ProcessorStatus},
     },
@@ -14,7 +16,7 @@ use uuid::Uuid;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct RequestDetails {
-    name: String,
+    processor_name: String,
     processor_id: Option<String>,
 }
 
@@ -34,10 +36,19 @@ pub async fn create_processor(
     State(server_state): State<AppState>,
     Json(payload): Json<RequestDetails>,
 ) -> Result<Json<ResponseDetails>, StatusCode> {
-    let (tx_for_adder, rx_for_adder) =
+    let (peers_tx, peers_rx) =
         mpsc::channel::<ProcessorCommand>(server_state.config.processor_queue_length);
 
-    let mut processor = InMemorySourceProcessor::new(payload.name, rx_for_adder);
+    let (parent_tx, parent_rx) = mpsc::channel::<ProcessorCommand>(32);
+
+    let mut processor = InMemorySourceProcessor::new(
+        payload.processor_name,
+        parent_tx.clone(),
+        parent_rx,
+        server_state.cancellation_token.clone(),
+        peers_rx,
+    );
+
     let processor_status = processor.status;
     let processor_id = processor.processor_id;
 
@@ -46,10 +57,10 @@ pub async fn create_processor(
     });
 
     server_state
-        .processor_senders
+        .peers_tx
         .lock()
         .await
-        .insert(processor_id, tx_for_adder);
+        .insert(processor_id, peers_tx);
 
     tracing::info!("Processor created: {}", processor_id);
     let result = Json(ResponseDetails {
@@ -66,12 +77,7 @@ pub async fn start_processor(
 ) -> Result<Json<ResponseDetails>, StatusCode> {
     let processor_id = Uuid::parse_str(&payload.processor_id.unwrap()).unwrap();
 
-    match server_state
-        .processor_senders
-        .lock()
-        .await
-        .get(&processor_id)
-    {
+    match server_state.peers_tx.lock().await.get(&processor_id) {
         Some(tx) => {
             tracing::info!("Starting processor: {}", processor_id);
             let _ = tx.send(ProcessorCommand::Start).await;
@@ -96,12 +102,7 @@ pub async fn stop_processor(
 ) -> Result<Json<ResponseDetails>, StatusCode> {
     let processor_id = Uuid::parse_str(&payload.processor_id.unwrap()).unwrap();
 
-    match server_state
-        .processor_senders
-        .lock()
-        .await
-        .get(&processor_id)
-    {
+    match server_state.peers_tx.lock().await.get(&processor_id) {
         Some(tx) => {
             let _ = tx.send(ProcessorCommand::Stop).await;
             let result = Json(ResponseDetails {
@@ -123,18 +124,13 @@ pub async fn delete_processor(State(server_state): State<AppState>) -> &'static 
 }
 
 #[tracing::instrument]
-pub async fn get_processor_status(
+pub async fn get_status(
     State(server_state): State<AppState>,
     Json(payload): Json<RequestDetails>,
 ) -> Result<Json<ResponseDetails>, StatusCode> {
     // TODO: How to get processor status?
     let processor_id = Uuid::parse_str(&payload.processor_id.unwrap()).unwrap();
-    match server_state
-        .processor_senders
-        .lock()
-        .await
-        .get(&processor_id)
-    {
+    match server_state.peers_tx.lock().await.get(&processor_id) {
         Some(processor_tx) => {
             let _ = processor_tx.send(ProcessorCommand::Stop).await;
             let result = Json(ResponseDetails {
@@ -201,7 +197,7 @@ mod tests {
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
-            processor_senders: Arc::new(Mutex::new(HashMap::new())),
+            peers_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()
@@ -210,7 +206,7 @@ mod tests {
 
         let test_server = TestServer::new(app).unwrap();
         let request_body: RequestDetails = RequestDetails {
-            name: "adder_processor".to_string(),
+            processor_name: "adder_processor".to_string(),
             processor_id: None,
         };
 
@@ -237,7 +233,7 @@ mod tests {
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
-            processor_senders: Arc::new(Mutex::new(HashMap::new())),
+            peers_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()
@@ -248,7 +244,7 @@ mod tests {
 
         let test_server = TestServer::new(app).unwrap();
         let request_body: RequestDetails = RequestDetails {
-            name: "adder_processor".to_string(),
+            processor_name: "adder_processor".to_string(),
             processor_id: None,
         };
 
@@ -262,7 +258,7 @@ mod tests {
         assert_eq!(response_details.status, super::ProcessorStatus::Stopped);
 
         let request_body: RequestDetails = RequestDetails {
-            name: "adder_processor".to_string(),
+            processor_name: "adder_processor".to_string(),
             processor_id: Some(response_details.processor_id),
         };
 
@@ -297,7 +293,7 @@ mod tests {
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
-            processor_senders: Arc::new(Mutex::new(HashMap::new())),
+            peers_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()
@@ -307,7 +303,7 @@ mod tests {
 
         let test_server = TestServer::new(app).unwrap();
         let request_body: RequestDetails = RequestDetails {
-            name: "adder_processor".to_string(),
+            processor_name: "adder_processor".to_string(),
             processor_id: None,
         };
 
@@ -321,7 +317,7 @@ mod tests {
         assert_eq!(response_details.status, super::ProcessorStatus::Stopped);
 
         let request_body: RequestDetails = RequestDetails {
-            name: "adder_processor".to_string(),
+            processor_name: "adder_processor".to_string(),
             processor_id: Some(response_details.processor_id),
         };
 

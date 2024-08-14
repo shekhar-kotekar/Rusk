@@ -1,83 +1,103 @@
-use std::time::Duration;
-
-use tokio::{sync::mpsc, time::sleep};
-use uuid::Uuid;
+use crate::processors::models::ProcessorStatus;
 
 use super::{
-    base_processor::Processor,
-    models::{InMemoryPacket, ProcessorCommand, ProcessorStatus},
+    base_processor::ProcessorV2,
+    models::{InMemoryPacket, ProcessorCommand},
 };
+use std::collections::HashMap;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
 
 pub struct InMemorySourceProcessor {
     pub processor_name: String,
     pub processor_id: Uuid,
-    tx: Vec<mpsc::Sender<ProcessorCommand>>,
-    rx: mpsc::Receiver<ProcessorCommand>,
-    pub status: ProcessorStatus,
-    delay: u64,
+    pub status: super::models::ProcessorStatus,
+    parent_tx: mpsc::Sender<ProcessorCommand>,
+    parent_rx: mpsc::Receiver<ProcessorCommand>,
+    peers_tx: HashMap<Uuid, mpsc::Sender<ProcessorCommand>>,
+    cancellation_token: CancellationToken,
 }
 
-impl Processor for InMemorySourceProcessor {
+impl ProcessorV2 for InMemorySourceProcessor {
     fn new(
         processor_name: String,
-        rx: mpsc::Receiver<ProcessorCommand>,
-    ) -> InMemorySourceProcessor {
+        parent_tx: mpsc::Sender<ProcessorCommand>,
+        parent_rx: mpsc::Receiver<ProcessorCommand>,
+        cancellation_token: CancellationToken,
+        peers_rx: mpsc::Receiver<ProcessorCommand>,
+    ) -> Self {
         InMemorySourceProcessor {
             processor_name,
             processor_id: Uuid::new_v4(),
-            tx: Vec::new(),
-            rx,
-            delay: 1000,
-            status: ProcessorStatus::Stopped,
+            status: super::models::ProcessorStatus::Stopped,
+            parent_tx,
+            parent_rx,
+            peers_tx: HashMap::new(),
+            cancellation_token,
         }
     }
-    fn add_tx(&mut self, tx: mpsc::Sender<ProcessorCommand>) {
-        self.tx.push(tx);
+
+    fn connect_processor(
+        &mut self,
+        receiver_processor_id: Uuid,
+        tx: mpsc::Sender<ProcessorCommand>,
+    ) {
+        self.peers_tx.insert(receiver_processor_id, tx);
+    }
+
+    fn disconnect_processor(&mut self, receiver_processor_id: Uuid) {
+        self.peers_tx.remove(&receiver_processor_id);
     }
 }
 
 impl InMemorySourceProcessor {
-    pub async fn run(&mut self, generate_packet_func: fn() -> InMemoryPacket) {
+    pub async fn run(&mut self, generate_packet_func: fn() -> Option<InMemoryPacket>) {
         loop {
             match self.status {
                 ProcessorStatus::Running => {
-                    if self.tx.is_empty() {
-                        tracing::info!(
-                            "{}: No processors to send packet to. Pausing.",
-                            self.processor_name
-                        );
-                        self.status = ProcessorStatus::Stopped;
-                    } else {
-                        let packet = generate_packet_func();
-                        for tx in &self.tx {
-                            let _ = tx
-                                .send(ProcessorCommand::InMemoryMessage(packet.clone()))
-                                .await;
+                    if let Some(packet) = generate_packet_func() {
+                        for tx in self.peers_tx.values() {
+                            tx.send(ProcessorCommand::InMemoryMessage(packet.clone()))
+                                .await
+                                .unwrap();
                         }
-                        let result = self.rx.try_recv();
-                        if let Ok(ProcessorCommand::Stop) = result {
-                            tracing::info!("{} : processor stopped.", self.processor_name);
+                    }
+                    tokio::select! {
+                        Some(command) = self.parent_rx.recv() => {
+                            match command {
+                                ProcessorCommand::Stop => {
+                                    self.status = ProcessorStatus::Stopped;
+                                    self.parent_tx.send(ProcessorCommand::Result(self.status)).await.unwrap();
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ = self.cancellation_token.cancelled() => {
+                            tracing::info!("Cancellation token received. Shutting down processor {}", self.processor_name);
                             break;
                         }
-                        tracing::info!(
-                            "{}: packet sent to {} processors. Sleeping for {} ms.",
-                            self.processor_name,
-                            self.tx.len(),
-                            self.delay
-                        );
-                        sleep(Duration::from_millis(self.delay)).await;
                     }
                 }
                 ProcessorStatus::Stopped => {
-                    tracing::info!(
-                        "{} processor is Stopped. Waiting for command on rx channel.",
-                        self.processor_name
-                    );
-                    let result = self.rx.recv().await;
-                    if let Some(ProcessorCommand::Start) = result {
-                        self.status = ProcessorStatus::Running;
-                        tracing::info!("{}: Started", self.processor_name);
+                    tokio::select! {
+                        Some(command) = self.parent_rx.recv() => {
+                            match command {
+                                ProcessorCommand::Start => {
+                                    self.status = ProcessorStatus::Running;
+                                    self.parent_tx.send(ProcessorCommand::Result(self.status)).await.unwrap();
+                                }
+                                _ => {}
+                            }
+                        }
+                        _ = self.cancellation_token.cancelled() => {
+                            tracing::info!("Cancellation token received. Shutting down processor {}", self.processor_name);
+                            break;
+                        }
                     }
+                }
+                ProcessorStatus::Errored => {
+                    break;
                 }
             }
         }

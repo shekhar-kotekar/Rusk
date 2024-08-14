@@ -4,6 +4,7 @@ use uuid::Uuid;
 pub enum ProcessorStatus {
     Running,
     Stopped,
+    Errored,
 }
 
 impl PartialEq for ProcessorStatus {
@@ -20,6 +21,8 @@ impl PartialEq for ProcessorStatus {
 pub enum ProcessorCommand {
     Stop,
     Start,
+    GetStatus,
+    Result(ProcessorStatus),
     InMemoryMessage(InMemoryPacket),
     ReferenceMessage(ReferencePacket),
 }
