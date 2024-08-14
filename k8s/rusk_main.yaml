@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: rusk-main
-        image: localhost:5000/rusk_main:latest
+        image: localhost:5001/rusk_main:latest
         ports:
         - containerPort: 5055
           name: rusk-main-svc

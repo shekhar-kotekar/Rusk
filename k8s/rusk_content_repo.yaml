@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: content-repository
-        image: localhost:5000/rusk_content_repo:latest
+        image: localhost:5001/rusk_content_repo:latest
         ports:
         - containerPort: 5056
           name: content-repository-svc
