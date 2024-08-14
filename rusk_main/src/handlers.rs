@@ -1,9 +1,7 @@
-use std::ops::Deref;
-
 use crate::{
     adder_func,
     processors::{
-        base_processor::ProcessorV2,
+        base_processor::SourceProcessor,
         in_memory_source_processor::InMemorySourceProcessor,
         models::{ProcessorCommand, ProcessorStatus},
     },
@@ -11,7 +9,7 @@ use crate::{
 };
 use axum::{debug_handler, extract::State, Json};
 use http::StatusCode;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -31,22 +29,21 @@ pub async fn is_alive() -> &'static str {
     "I am alive!"
 }
 
+const PARENT_PROCESSOR_CHANNEL_SIZE: usize = 10;
+
 #[tracing::instrument]
 pub async fn create_processor(
     State(server_state): State<AppState>,
     Json(payload): Json<RequestDetails>,
 ) -> Result<Json<ResponseDetails>, StatusCode> {
-    let (peers_tx, peers_rx) =
-        mpsc::channel::<ProcessorCommand>(server_state.config.processor_queue_length);
-
-    let (parent_tx, parent_rx) = mpsc::channel::<ProcessorCommand>(32);
+    let (parent_to_processor_tx, processor_to_parent_rx) =
+        mpsc::channel::<ProcessorCommand>(PARENT_PROCESSOR_CHANNEL_SIZE);
 
     let mut processor = InMemorySourceProcessor::new(
         payload.processor_name,
-        parent_tx.clone(),
-        parent_rx,
+        processor_to_parent_rx,
+        Vec::new(),
         server_state.cancellation_token.clone(),
-        peers_rx,
     );
 
     let processor_status = processor.status;
@@ -57,10 +54,10 @@ pub async fn create_processor(
     });
 
     server_state
-        .peers_tx
+        .parent_processor_tx
         .lock()
         .await
-        .insert(processor_id, peers_tx);
+        .insert(processor_id, parent_to_processor_tx);
 
     tracing::info!("Processor created: {}", processor_id);
     let result = Json(ResponseDetails {
@@ -77,15 +74,29 @@ pub async fn start_processor(
 ) -> Result<Json<ResponseDetails>, StatusCode> {
     let processor_id = Uuid::parse_str(&payload.processor_id.unwrap()).unwrap();
 
-    match server_state.peers_tx.lock().await.get(&processor_id) {
+    match server_state
+        .parent_processor_tx
+        .lock()
+        .await
+        .get(&processor_id)
+    {
         Some(tx) => {
-            tracing::info!("Starting processor: {}", processor_id);
-            let _ = tx.send(ProcessorCommand::Start).await;
-            let result = Json(ResponseDetails {
-                processor_id: processor_id.to_string(),
-                status: ProcessorStatus::Running,
-            });
-            return Ok(result);
+            let (oneshot_tx, oneshot_rx) = oneshot::channel();
+            let command = ProcessorCommand::Start { resp: oneshot_tx };
+
+            tx.send(command).await.unwrap();
+            match oneshot_rx.await.unwrap() {
+                ProcessorStatus::Running => {
+                    let result = Json(ResponseDetails {
+                        processor_id: processor_id.to_string(),
+                        status: ProcessorStatus::Running,
+                    });
+                    return Ok(result);
+                }
+                _ => {
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
         }
         None => {
             tracing::error!("Processor not found: {}", processor_id);
@@ -101,15 +112,29 @@ pub async fn stop_processor(
     Json(payload): Json<RequestDetails>,
 ) -> Result<Json<ResponseDetails>, StatusCode> {
     let processor_id = Uuid::parse_str(&payload.processor_id.unwrap()).unwrap();
-
-    match server_state.peers_tx.lock().await.get(&processor_id) {
+    match server_state
+        .parent_processor_tx
+        .lock()
+        .await
+        .get(&processor_id)
+    {
         Some(tx) => {
-            let _ = tx.send(ProcessorCommand::Stop).await;
-            let result = Json(ResponseDetails {
-                processor_id: processor_id.to_string(),
-                status: ProcessorStatus::Stopped,
-            });
-            return Ok(result);
+            let (oneshot_tx, oneshot_rx) = oneshot::channel();
+            let command = ProcessorCommand::Stop { resp: oneshot_tx };
+
+            tx.send(command).await.unwrap();
+            match oneshot_rx.await.unwrap() {
+                ProcessorStatus::Stopped => {
+                    let result = Json(ResponseDetails {
+                        processor_id: processor_id.to_string(),
+                        status: ProcessorStatus::Stopped,
+                    });
+                    return Ok(result);
+                }
+                _ => {
+                    return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                }
+            }
         }
         None => {
             tracing::error!("Processor not found: {}", processor_id);
@@ -130,16 +155,28 @@ pub async fn get_status(
 ) -> Result<Json<ResponseDetails>, StatusCode> {
     // TODO: How to get processor status?
     let processor_id = Uuid::parse_str(&payload.processor_id.unwrap()).unwrap();
-    match server_state.peers_tx.lock().await.get(&processor_id) {
-        Some(processor_tx) => {
-            let _ = processor_tx.send(ProcessorCommand::Stop).await;
+    println!("checking status of Processor ID: {}", processor_id);
+    match server_state
+        .parent_processor_tx
+        .lock()
+        .await
+        .get(&processor_id)
+    {
+        Some(tx) => {
+            let (oneshot_tx, oneshot_rx) = oneshot::channel();
+            let command = ProcessorCommand::GetStatus { resp: oneshot_tx };
+
+            tx.send(command).await.unwrap();
+
+            let processor_current_status = oneshot_rx.await.unwrap();
             let result = Json(ResponseDetails {
                 processor_id: processor_id.to_string(),
-                status: ProcessorStatus::Running,
+                status: processor_current_status,
             });
             return Ok(result);
         }
         None => {
+            tracing::error!("Processor not found: {}", processor_id);
             return Err(StatusCode::NOT_FOUND);
         }
     }
@@ -198,6 +235,7 @@ mod tests {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
+            parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()
@@ -215,6 +253,7 @@ mod tests {
 
         let response_details = response.json::<ResponseDetails>();
         assert_eq!(response_details.status, super::ProcessorStatus::Stopped);
+
         cancellation_token.cancel();
     }
 
@@ -235,6 +274,7 @@ mod tests {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
+            parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()
@@ -267,7 +307,30 @@ mod tests {
             .await;
         get_status_response.assert_status_ok();
         let response_details = get_status_response.json::<ResponseDetails>();
+        assert_eq!(
+            response_details.status,
+            super::ProcessorStatus::Stopped,
+            "Processor status should be 'Stopped' as soon as we have created the processor."
+        );
+
+        let start_processor_response = test_server
+            .post(start_processor_route)
+            .json(&json!(request_body))
+            .await;
+        start_processor_response.assert_status_ok();
+        let response_details = start_processor_response.json::<ResponseDetails>();
         assert_eq!(response_details.status, super::ProcessorStatus::Running);
+        let get_status_response = test_server
+            .get(get_status_route)
+            .json(&json!(request_body))
+            .await;
+        get_status_response.assert_status_ok();
+        let response_details = get_status_response.json::<ResponseDetails>();
+        assert_eq!(
+            response_details.status,
+            super::ProcessorStatus::Running,
+            "Processor status should be 'Running' after we start the processor."
+        );
 
         let stop_processor_response = test_server
             .post(stop_processor_route)
@@ -276,6 +339,17 @@ mod tests {
         stop_processor_response.assert_status_ok();
         let response_details = stop_processor_response.json::<ResponseDetails>();
         assert_eq!(response_details.status, super::ProcessorStatus::Stopped);
+        let get_status_response = test_server
+            .get(get_status_route)
+            .json(&json!(request_body))
+            .await;
+        get_status_response.assert_status_ok();
+        let response_details = get_status_response.json::<ResponseDetails>();
+        assert_eq!(
+            response_details.status,
+            super::ProcessorStatus::Stopped,
+            "Processor status should be 'Stopped' after we stop the processor."
+        );
 
         cancellation_token.cancel();
     }
@@ -296,6 +370,7 @@ mod tests {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
+            parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()
@@ -356,6 +431,7 @@ mod tests {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
+            parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let app = Router::new()

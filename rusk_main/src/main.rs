@@ -7,7 +7,7 @@ use axum::{
 };
 use commons::MainConfig;
 use http::{header, Method};
-use processors::models::{InMemoryPacket, ProcessorCommand};
+use processors::models::{InMemoryPacket, Message, ProcessorCommand};
 use rand::Rng;
 use tokio::{
     signal,
@@ -24,7 +24,8 @@ mod processors;
 struct AppState {
     config: MainConfig,
     cancellation_token: CancellationToken,
-    peers_tx: Arc<Mutex<HashMap<Uuid, mpsc::Sender<ProcessorCommand>>>>,
+    peers_tx: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
+    parent_processor_tx: Arc<Mutex<HashMap<Uuid, mpsc::Sender<ProcessorCommand>>>>,
 }
 
 #[tokio::main]
@@ -38,6 +39,7 @@ async fn main() {
         config: main_config.clone(),
         cancellation_token: cancellation_token.clone(),
         peers_tx: Arc::new(Mutex::new(HashMap::new())),
+        parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let cors = CorsLayer::new()

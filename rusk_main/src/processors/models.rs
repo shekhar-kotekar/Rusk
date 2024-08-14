@@ -1,3 +1,4 @@
+use tokio::sync::oneshot;
 use uuid::Uuid;
 
 #[derive(Copy, Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -17,12 +18,17 @@ impl PartialEq for ProcessorStatus {
     }
 }
 
-#[derive(Clone, Debug)]
+pub type Responder<T> = oneshot::Sender<T>;
+
+#[derive(Debug)]
 pub enum ProcessorCommand {
-    Stop,
-    Start,
-    GetStatus,
-    Result(ProcessorStatus),
+    Stop { resp: Responder<ProcessorStatus> },
+    Start { resp: Responder<ProcessorStatus> },
+    GetStatus { resp: Responder<ProcessorStatus> },
+}
+
+#[derive(Clone, Debug)]
+pub enum Message {
     InMemoryMessage(InMemoryPacket),
     ReferenceMessage(ReferencePacket),
 }
