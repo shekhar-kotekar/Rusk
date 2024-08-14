@@ -5,6 +5,11 @@ k8s_context := kind-kind
 
 .PHONY: prepare test run release build_web
 
+install_git_hooks:
+	@echo "Installing git hooks"
+	cp git_hooks/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+
 set_kind_context:
 	kubectl config use-context ${k8s_context}
 
