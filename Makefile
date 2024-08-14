@@ -5,15 +5,16 @@ k8s_context := kind-kind
 
 .PHONY: prepare test run release build_web
 
+set_kind_context:
+	kubectl config use-context ${k8s_context}
+
 prepare:
 	@if [ -z "$(PACKAGE)" ]; then \
         echo "Error: PACKAGE variable is not set"; \
         exit 1; \
     fi
 	@echo "Preparing $(PACKAGE) package"
-
 	cargo fmt && cargo clippy && cargo check
-	kubectl config use-context ${k8s_context}
 
 test: prepare
 	@echo
@@ -26,8 +27,7 @@ run: test
 release: test
 	cargo build --release
 
-deploy_common:
-	kubectl config use-context ${k8s_context}
+deploy_common: set_kind_context
 	kubectl apply -f k8s/common.yaml
 
 deploy_client: deploy_common
@@ -40,7 +40,7 @@ deploy_client: deploy_common
 	kubectl apply -f k8s/rusk_client.yaml
 	@echo "Client deployed successfully! Access the client using http://localhost:8080 URL in browser."
 
-build: prepare
+build: prepare set_kind_context
 	@echo "INFO: Building $(PACKAGE) package"
 	docker build --tag ${IMAGE_REGISTRY}/rusk_$(PACKAGE):latest -f rusk_$(PACKAGE)/Dockerfile .
 	docker push ${IMAGE_REGISTRY}/rusk_$(PACKAGE):latest
@@ -51,20 +51,7 @@ deploy: build deploy_common
 	kubectl apply -f k8s/rusk_$(PACKAGE).yaml
 	@echo "$(PACKAGE) deployed successfully!"
 
-run_content_repo: test
-	@echo $$CONFIG_FILE_PATH
-	cargo run --package content_repository
-
-test_content_repo: prepare
-	cargo test -p content_repository --bin content_repository
-
-build_all:
-	@echo "NOT IMPLEMENTED!"
-
-deploy_all: build_all
-	@echo "INFO: all modules deployed successfully!"
-
-delete_all:
+delete_all: set_kind_context
 	kubectl delete -f k8s/rusk_content_repo.yaml
 	kubectl delete -f k8s/rusk_main.yaml
 	kubectl delete -f k8s/rusk_client.yaml
