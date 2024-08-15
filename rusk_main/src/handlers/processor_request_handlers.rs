@@ -46,7 +46,6 @@ pub async fn create_processor(
         .await
         .insert(processor_id, parent_to_processor_tx);
 
-    tracing::info!("Processor created: {}", processor_id);
     let result = Json(ResponseDetails {
         processor_id: processor_id.to_string(),
         status: processor_status,

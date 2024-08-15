@@ -31,7 +31,7 @@ impl SinkProcessor for InMemoryProcessor {
             processor_id: Uuid::new_v4(),
             status: super::models::ProcessorStatus::Stopped,
             parent_rx,
-            peers_rx: peers_rx,
+            peers_rx,
             peers_tx: HashMap::new(),
             cancellation_token,
         }
@@ -75,7 +75,7 @@ impl InMemoryProcessor {
                                 "{}: Received packet from someone. Processing it.",
                                 self.processor_name
                             );
-                            if self.peers_tx.len() > 0 {
+                            if !self.peers_tx.is_empty() {
                             let processed_packet = process_packet_func(packet);
                             match processed_packet {
                                 Some(packet) => {

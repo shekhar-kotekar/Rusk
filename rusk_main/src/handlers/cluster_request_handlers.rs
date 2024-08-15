@@ -15,7 +15,7 @@ pub async fn get_cluster_info(
     State(server_state): State<AppState>,
 ) -> Result<Json<ClusterInfo>, StatusCode> {
     let processors_in_clusteer = server_state
-        .peers_tx
+        .parent_processor_tx
         .lock()
         .await
         .keys()
