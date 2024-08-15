@@ -14,7 +14,8 @@ Execute `make build PACKAGE=<package name without rust_prefix>` command. For exa
 ## Rusk Main module
 Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
 - Execute `make deploy PACKAGE=main` command build Docker image and deploy it in local `kind`cluster.
-- curl `curl -v http://localhost:30002/is_alive`
+- `curl -v http://localhost:30002/is_alive` for aliveness probe
+- `curl -v http://localhost:30002/cluster/get_info` to get cluster information
 - 30002 port becomes available only when we have created `kind cluster`using `k8s/kind-local-registry.sh` script.
 
 ## Useful commands:
@@ -30,5 +31,3 @@ For producer processors, instead of processor creating FlowFile by itself, it wi
 
 ## References:
 - NiFi docs : https://nifi.apache.org/docs/nifi-docs/html/nifi-in-depth.html#intro
-- Minikube local registry - https://minikube.sigs.k8s.io/docs/handbook/registry/
-- Minikube docker on MacOs - https://minikube.sigs.k8s.io/docs/handbook/registry/#docker-on-macos
