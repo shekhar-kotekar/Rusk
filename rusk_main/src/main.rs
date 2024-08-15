@@ -6,6 +6,7 @@ use axum::{
     Router,
 };
 use commons::MainConfig;
+use handlers::{cluster_request_handlers, processor_request_handlers};
 use http::{header, Method};
 use processors::models::{InMemoryPacket, Message, ProcessorCommand};
 use rand::Rng;
@@ -49,17 +50,42 @@ async fn main() {
 
     // TODO: Add route for pause and resume processor
     let server = Router::new()
-        .route("/is_alive", get(handlers::is_alive))
-        .route("/processor/delete", delete(handlers::delete_processor))
-        .route("/processor/stop", post(handlers::stop_processor))
-        .route("/processor/start", post(handlers::start_processor))
-        .route("/processor/create", post(handlers::create_processor))
-        .route("/processor/get_status", get(handlers::get_status))
-        .route("/processor/get_info", get(handlers::get_processor_info))
-        .route("/processor/connect", post(handlers::connect_processors))
+        .route("/cluster/is_alive", get(cluster_request_handlers::is_alive))
+        .route(
+            "/cluster/get_info",
+            get(cluster_request_handlers::get_cluster_info),
+        )
+        .route(
+            "/processor/delete",
+            delete(processor_request_handlers::delete_processor),
+        )
+        .route(
+            "/processor/stop",
+            post(processor_request_handlers::stop_processor),
+        )
+        .route(
+            "/processor/start",
+            post(processor_request_handlers::start_processor),
+        )
+        .route(
+            "/processor/create",
+            post(processor_request_handlers::create_processor),
+        )
+        .route(
+            "/processor/get_status",
+            get(processor_request_handlers::get_status),
+        )
+        .route(
+            "/processor/get_info",
+            get(processor_request_handlers::get_processor_info),
+        )
+        .route(
+            "/processor/connect",
+            post(processor_request_handlers::connect_processors),
+        )
         .route(
             "/processor/disconnect",
-            post(handlers::disconnect_processors),
+            post(processor_request_handlers::disconnect_processors),
         )
         .layer(cors)
         .with_state(state);

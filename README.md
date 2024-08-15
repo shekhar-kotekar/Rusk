@@ -11,9 +11,11 @@ NiFi equivalent built using Rust. Architecture diagram and other high level deta
 #### Local testing
 Execute `make build PACKAGE=<package name without rust_prefix>` command. For example, to build `rusk_main` package, execute `make build PACKAGE=main`. Similarly we can execute `make deploy` command to build and deploy image in local `kind` based cluster.
 
-## Rusk Web module
+## Rusk Main module
 Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
-Execute `make build_web` command build Docker image
+- Execute `make deploy PACKAGE=main` command build Docker image and deploy it in local `kind`cluster.
+- curl `curl -v http://localhost:30002/is_alive`
+- 30002 port becomes available only when we have created `kind cluster`using `k8s/kind-local-registry.sh` script.
 
 ## Useful commands:
 - To add a new library package, execute `cargo new --lib <PACKAGE_NAME> --vcs none`

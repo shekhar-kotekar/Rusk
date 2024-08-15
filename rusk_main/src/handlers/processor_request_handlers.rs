@@ -14,22 +14,7 @@ use http::StatusCode;
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct RequestDetails {
-    processor_name: String,
-    processor_id: Option<String>,
-}
-
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct ResponseDetails {
-    processor_id: String,
-    status: ProcessorStatus,
-}
-
-#[tracing::instrument]
-pub async fn is_alive() -> &'static str {
-    "I am alive!"
-}
+use super::models::{ProcessorInfo, RequestDetails, ResponseDetails};
 
 const PARENT_PROCESSOR_CHANNEL_SIZE: usize = 10;
 
@@ -185,8 +170,15 @@ pub async fn get_status(
 }
 
 #[tracing::instrument]
-pub async fn get_processor_info(State(server_state): State<AppState>) -> &'static str {
-    "get processor info"
+pub async fn get_processor_info(
+    State(server_state): State<AppState>,
+) -> Result<Json<ProcessorInfo>, StatusCode> {
+    let processor_info = ProcessorInfo {
+        processor_id: "DUMMY PROCESSOR ID".to_string(),
+        status: ProcessorStatus::Stopped,
+        number_of_packets_processed: 0,
+    };
+    Ok(Json(processor_info))
 }
 
 #[tracing::instrument]
@@ -213,16 +205,7 @@ mod tests {
     use tokio::sync::Mutex;
     use tokio_util::sync::CancellationToken;
 
-    use crate::handlers::{RequestDetails, ResponseDetails};
-
-    #[tokio::test]
-    async fn test_is_alive() {
-        let app = Router::new().route("/is_alive", get(super::is_alive));
-        let test_server = TestServer::new(app).unwrap();
-        let response = test_server.get("/is_alive").await;
-        response.assert_status_ok();
-        response.assert_text("I am alive!");
-    }
+    use crate::handlers::models::{RequestDetails, ResponseDetails};
 
     #[tokio::test]
     async fn test_create_processor() {
