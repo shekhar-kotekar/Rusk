@@ -1,11 +1,19 @@
 use tokio::sync::oneshot;
 use uuid::Uuid;
 
+use crate::handlers::models::ProcessorInfo;
+
 #[derive(Copy, Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum ProcessorStatus {
     Running,
     Stopped,
     Errored,
+}
+
+#[derive(Debug)]
+pub enum ProcessorType {
+    SourceProcessor,
+    Other,
 }
 
 impl PartialEq for ProcessorStatus {
@@ -22,9 +30,27 @@ pub type Responder<T> = oneshot::Sender<T>;
 
 #[derive(Debug)]
 pub enum ProcessorCommand {
-    Stop { resp: Responder<ProcessorStatus> },
-    Start { resp: Responder<ProcessorStatus> },
-    GetStatus { resp: Responder<ProcessorStatus> },
+    Stop {
+        resp: Responder<ProcessorStatus>,
+    },
+    Start {
+        resp: Responder<ProcessorStatus>,
+    },
+    Connect {
+        destination_processor_id: Uuid,
+        destination_processor_tx: tokio::sync::mpsc::Sender<Message>,
+        resp: Responder<ProcessorStatus>,
+    },
+    Disconnect {
+        destination_processor_id: Uuid,
+        resp: Responder<ProcessorStatus>,
+    },
+    GetStatus {
+        resp: Responder<ProcessorStatus>,
+    },
+    GetInfo {
+        resp: Responder<ProcessorInfo>,
+    },
 }
 
 #[derive(Clone, Debug)]

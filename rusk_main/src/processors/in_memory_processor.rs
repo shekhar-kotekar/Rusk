@@ -1,4 +1,4 @@
-use crate::processors::models::ProcessorStatus;
+use crate::{handlers::models::ProcessorInfo, processors::models::ProcessorStatus};
 
 use super::{
     base_processor::{ProcessorConnection, SinkProcessor},
@@ -65,6 +65,22 @@ impl InMemoryProcessor {
                         }
                         ProcessorCommand::GetStatus {resp} => {
                             resp.send(self.status).unwrap();
+                        }
+                        ProcessorCommand::Connect {destination_processor_id, destination_processor_tx, resp} => {
+                            self.connect_processor(destination_processor_id, destination_processor_tx);
+                            resp.send(self.status).unwrap();
+                        }
+                        ProcessorCommand::Disconnect {destination_processor_id, resp} => {
+                            self.disconnect_processor(destination_processor_id);
+                            resp.send(self.status).unwrap();
+                        }
+                        ProcessorCommand::GetInfo {resp} => {
+                            let processor_info = ProcessorInfo {
+                                processor_id: self.processor_id.to_string(),
+                                status: self.status,
+                                number_of_packets_processed: 0,
+                            };
+                            resp.send(processor_info).unwrap();
                         }
                     }
                 }

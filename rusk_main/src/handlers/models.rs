@@ -12,6 +12,12 @@ pub struct RequestDetails {
     pub processor_id: Option<String>,
 }
 
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct ProcessorConnectionRequest {
+    pub source_processor_id: String,
+    pub destination_processor_id: String,
+}
+
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ResponseDetails {
     pub processor_id: String,

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use crate::processors::models::{Message, ProcessorStatus};
+use crate::{
+    handlers::models::ProcessorInfo,
+    processors::models::{Message, ProcessorStatus},
+};
 
 use super::{
     base_processor::{ProcessorConnection, SourceProcessor},
@@ -68,6 +71,22 @@ impl InMemorySourceProcessor {
                         ProcessorCommand::GetStatus {resp} => {
                             println!("status of {}: {:?}", self.processor_name, self.status);
                             resp.send(self.status).unwrap();
+                        }
+                        ProcessorCommand::Connect {destination_processor_id, destination_processor_tx, resp} => {
+                            self.connect_processor(destination_processor_id, destination_processor_tx);
+                            resp.send(self.status).unwrap();
+                        }
+                        ProcessorCommand::Disconnect {destination_processor_id, resp} => {
+                            self.disconnect_processor(destination_processor_id);
+                            resp.send(self.status).unwrap();
+                        }
+                        ProcessorCommand::GetInfo {resp} => {
+                            let processor_info = ProcessorInfo {
+                                processor_id: self.processor_id.to_string(),
+                                status: self.status,
+                                number_of_packets_processed: 0,
+                            };
+                            resp.send(processor_info).unwrap();
                         }
                     }
                 }

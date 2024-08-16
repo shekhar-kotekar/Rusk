@@ -1,22 +1,59 @@
 use std::collections::HashMap;
 
 use crate::{
-    adder_func,
+    adder_func, doubler_func,
     processors::{
-        base_processor::SourceProcessor,
+        base_processor::{SinkProcessor, SourceProcessor},
+        in_memory_processor::InMemoryProcessor,
         in_memory_source_processor::InMemorySourceProcessor,
-        models::{ProcessorCommand, ProcessorStatus},
+        models::{Message, ProcessorCommand, ProcessorStatus, ProcessorType},
     },
     AppState,
 };
-use axum::{debug_handler, extract::State, Json};
+use axum::{debug_handler, extract::Path, extract::State, Json};
 use http::StatusCode;
 use tokio::sync::{mpsc, oneshot};
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use super::models::{ProcessorInfo, RequestDetails, ResponseDetails};
+use super::models::{ProcessorConnectionRequest, ProcessorInfo, RequestDetails, ResponseDetails};
 
 const PARENT_PROCESSOR_CHANNEL_SIZE: usize = 10;
+
+fn create_source_processor(
+    processor_name: String,
+    processor_to_parent_rx: mpsc::Receiver<ProcessorCommand>,
+    cancellation_token: CancellationToken,
+) -> Uuid {
+    let mut processor = InMemorySourceProcessor::new(
+        processor_name,
+        processor_to_parent_rx,
+        HashMap::new(),
+        cancellation_token,
+    );
+
+    let processor_id = processor.processor_id;
+
+    tokio::spawn(async move {
+        processor.run(adder_func).await;
+    });
+    processor_id
+}
+
+fn create_normal_processor(
+    processor_name: String,
+    parent_rx: mpsc::Receiver<ProcessorCommand>,
+    peers_rx: mpsc::Receiver<Message>,
+    cancellation_token: CancellationToken,
+) -> Uuid {
+    let mut processor =
+        InMemoryProcessor::new(processor_name, peers_rx, parent_rx, cancellation_token);
+    let processor_id = processor.processor_id;
+    tokio::spawn(async move {
+        processor.run(doubler_func).await;
+    });
+    processor_id
+}
 
 #[tracing::instrument]
 pub async fn create_processor(
@@ -26,31 +63,64 @@ pub async fn create_processor(
     let (parent_to_processor_tx, processor_to_parent_rx) =
         mpsc::channel::<ProcessorCommand>(PARENT_PROCESSOR_CHANNEL_SIZE);
 
-    let mut processor = InMemorySourceProcessor::new(
-        payload.processor_name,
-        processor_to_parent_rx,
-        HashMap::new(),
-        server_state.cancellation_token.clone(),
-    );
-
-    let processor_status = processor.status;
-    let processor_id = processor.processor_id;
-
-    tokio::spawn(async move {
-        processor.run(adder_func).await;
-    });
-
-    server_state
-        .parent_processor_tx
+    match server_state
+        .processor_types_mappings
         .lock()
         .await
-        .insert(processor_id, parent_to_processor_tx);
+        .get(payload.processor_name.as_str())
+    {
+        Some(ProcessorType::SourceProcessor) => {
+            let processor_id = create_source_processor(
+                payload.processor_name.clone(),
+                processor_to_parent_rx,
+                server_state.cancellation_token.clone(),
+            );
 
-    let result = Json(ResponseDetails {
-        processor_id: processor_id.to_string(),
-        status: processor_status,
-    });
-    return Ok(result);
+            server_state
+                .parent_processor_tx
+                .lock()
+                .await
+                .insert(processor_id, parent_to_processor_tx);
+
+            let result = Json(ResponseDetails {
+                processor_id: processor_id.to_string(),
+                status: ProcessorStatus::Stopped,
+            });
+            return Ok(result);
+        }
+        Some(ProcessorType::Other) => {
+            let (peers_tx, peers_rx) =
+                mpsc::channel::<Message>(server_state.config.processor_queue_length);
+
+            let processor_id = create_normal_processor(
+                payload.processor_name.clone(),
+                processor_to_parent_rx,
+                peers_rx,
+                server_state.cancellation_token.clone(),
+            );
+
+            server_state
+                .parent_processor_tx
+                .lock()
+                .await
+                .insert(processor_id, parent_to_processor_tx);
+
+            server_state
+                .peers_tx
+                .lock()
+                .await
+                .insert(processor_id, peers_tx);
+
+            let result = Json(ResponseDetails {
+                processor_id: processor_id.to_string(),
+                status: ProcessorStatus::Stopped,
+            });
+            return Ok(result);
+        }
+        None => {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
 }
 
 #[tracing::instrument]
@@ -171,23 +241,112 @@ pub async fn get_status(
 #[tracing::instrument]
 pub async fn get_processor_info(
     State(server_state): State<AppState>,
+    Path(processor_id): Path<String>,
 ) -> Result<Json<ProcessorInfo>, StatusCode> {
-    let processor_info = ProcessorInfo {
-        processor_id: "DUMMY PROCESSOR ID".to_string(),
-        status: ProcessorStatus::Stopped,
-        number_of_packets_processed: 0,
-    };
-    Ok(Json(processor_info))
+    match server_state
+        .parent_processor_tx
+        .lock()
+        .await
+        .get(&Uuid::parse_str(&processor_id).unwrap())
+    {
+        Some(tx) => {
+            let (oneshot_tx, oneshot_rx) = oneshot::channel();
+            let command = ProcessorCommand::GetInfo { resp: oneshot_tx };
+
+            tx.send(command).await.unwrap();
+            let processor_info = oneshot_rx.await.unwrap();
+            let result = Json(processor_info);
+            return Ok(result);
+        }
+        None => {
+            return Err(StatusCode::NOT_FOUND);
+        }
+    }
 }
 
 #[tracing::instrument]
-pub async fn connect_processors(State(server_state): State<AppState>) -> &'static str {
-    "NOT IMPLEMENTED YET!"
+pub async fn connect_processors(
+    State(server_state): State<AppState>,
+    Json(payload): Json<ProcessorConnectionRequest>,
+) -> Result<Json<ProcessorInfo>, StatusCode> {
+    let source_processor_id = Uuid::parse_str(&payload.source_processor_id).unwrap();
+    let destination_processor_id = Uuid::parse_str(&payload.destination_processor_id).unwrap();
+
+    match server_state
+        .peers_tx
+        .lock()
+        .await
+        .get(&destination_processor_id)
+    {
+        Some(tx) => {
+            match server_state
+                .parent_processor_tx
+                .lock()
+                .await
+                .get(&source_processor_id)
+            {
+                Some(source_tx) => {
+                    let (oneshot_tx, oneshot_rx) = oneshot::channel();
+                    let command = ProcessorCommand::Connect {
+                        destination_processor_id,
+                        destination_processor_tx: tx.clone(),
+                        resp: oneshot_tx,
+                    };
+
+                    source_tx.send(command).await.unwrap();
+                    let processor_current_status = oneshot_rx.await.unwrap();
+                    let result = Json(ProcessorInfo {
+                        processor_id: source_processor_id.to_string(),
+                        status: processor_current_status,
+                        number_of_packets_processed: 0,
+                    });
+                    return Ok(result);
+                }
+                None => {
+                    return Err(StatusCode::NOT_FOUND);
+                }
+            }
+        }
+        None => {
+            return Err(StatusCode::NOT_FOUND);
+        }
+    }
 }
 
 #[tracing::instrument]
-pub async fn disconnect_processors(State(server_state): State<AppState>) -> &'static str {
-    "NOT IMPLEMENTED YET!"
+pub async fn disconnect_processors(
+    State(server_state): State<AppState>,
+    Json(payload): Json<ProcessorConnectionRequest>,
+) -> Result<Json<ProcessorInfo>, StatusCode> {
+    let source_processor_id = Uuid::parse_str(&payload.source_processor_id).unwrap();
+    let destination_processor_id = Uuid::parse_str(&payload.destination_processor_id).unwrap();
+
+    match server_state
+        .parent_processor_tx
+        .lock()
+        .await
+        .get(&source_processor_id)
+    {
+        Some(source_tx) => {
+            let (oneshot_tx, oneshot_rx) = oneshot::channel();
+            let command = ProcessorCommand::Disconnect {
+                destination_processor_id,
+                resp: oneshot_tx,
+            };
+
+            source_tx.send(command).await.unwrap();
+            let processor_current_status = oneshot_rx.await.unwrap();
+            let result = Json(ProcessorInfo {
+                processor_id: source_processor_id.to_string(),
+                status: processor_current_status,
+                number_of_packets_processed: 0,
+            });
+            return Ok(result);
+        }
+        None => {
+            return Err(StatusCode::NOT_FOUND);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -195,7 +354,7 @@ mod tests {
     use std::{collections::HashMap, sync::Arc};
 
     use axum::{
-        routing::{get, post},
+        routing::{get, patch, post},
         Router,
     };
     use axum_test::TestServer;
@@ -204,7 +363,10 @@ mod tests {
     use tokio::sync::Mutex;
     use tokio_util::sync::CancellationToken;
 
-    use crate::handlers::models::{RequestDetails, ResponseDetails};
+    use crate::{
+        handlers::models::{RequestDetails, ResponseDetails},
+        processors::models::ProcessorType,
+    };
 
     #[tokio::test]
     async fn test_create_processor() {
@@ -215,11 +377,20 @@ mod tests {
             processor_queue_length: 10,
         };
         let cancellation_token = CancellationToken::new();
+        let processor_mappings = HashMap::from([
+            (
+                "adder_processor".to_string(),
+                ProcessorType::SourceProcessor,
+            ),
+            ("doubler_processor".to_string(), ProcessorType::Other),
+        ]);
+
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
             parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
+            processor_types_mappings: Arc::new(Mutex::new(processor_mappings)),
         };
 
         let app = Router::new()
@@ -252,6 +423,13 @@ mod tests {
             server_port: 8080,
             processor_queue_length: 10,
         };
+        let processor_mappings = HashMap::from([
+            (
+                "adder_processor".to_string(),
+                ProcessorType::SourceProcessor,
+            ),
+            ("doubler_processor".to_string(), ProcessorType::Other),
+        ]);
 
         let cancellation_token = CancellationToken::new();
         let state = super::AppState {
@@ -259,12 +437,13 @@ mod tests {
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
             parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
+            processor_types_mappings: Arc::new(Mutex::new(processor_mappings)),
         };
 
         let app = Router::new()
             .route(&create_processor_route, post(super::create_processor))
-            .route(&start_processor_route, post(super::start_processor))
-            .route(&stop_processor_route, post(super::stop_processor))
+            .route(&start_processor_route, patch(super::start_processor))
+            .route(&stop_processor_route, patch(super::stop_processor))
             .route(&get_status_route, get(super::get_status))
             .with_state(state);
 
@@ -298,7 +477,7 @@ mod tests {
         );
 
         let start_processor_response = test_server
-            .post(start_processor_route)
+            .patch(start_processor_route)
             .json(&json!(request_body))
             .await;
         start_processor_response.assert_status_ok();
@@ -317,7 +496,7 @@ mod tests {
         );
 
         let stop_processor_response = test_server
-            .post(stop_processor_route)
+            .patch(stop_processor_route)
             .json(&json!(request_body))
             .await;
         stop_processor_response.assert_status_ok();
@@ -349,18 +528,26 @@ mod tests {
             processor_queue_length: 10,
         };
 
+        let processor_mappings = HashMap::from([
+            (
+                "adder_processor".to_string(),
+                ProcessorType::SourceProcessor,
+            ),
+            ("doubler_processor".to_string(), ProcessorType::Other),
+        ]);
         let cancellation_token = CancellationToken::new();
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
             parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
+            processor_types_mappings: Arc::new(Mutex::new(processor_mappings)),
         };
 
         let app = Router::new()
             .route(&create_processor_route, post(super::create_processor))
-            .route(&start_processor_route, post(super::start_processor))
-            .route(&stop_processor_route, post(super::stop_processor))
+            .route(&start_processor_route, patch(super::start_processor))
+            .route(&stop_processor_route, patch(super::stop_processor))
             .with_state(state);
 
         let test_server = TestServer::new(app).unwrap();
@@ -384,7 +571,7 @@ mod tests {
         };
 
         let response = test_server
-            .post(start_processor_route)
+            .patch(start_processor_route)
             .json(&json!(request_body))
             .await;
         response.assert_status_ok();
@@ -392,7 +579,7 @@ mod tests {
         assert_eq!(response_details.status, super::ProcessorStatus::Running);
 
         let response = test_server
-            .post(stop_processor_route)
+            .patch(stop_processor_route)
             .json(&json!(request_body))
             .await;
         response.assert_status_ok();
@@ -410,17 +597,26 @@ mod tests {
             server_port: 8080,
             processor_queue_length: 10,
         };
+
+        let processor_mappings = HashMap::from([
+            (
+                "adder_processor".to_string(),
+                ProcessorType::SourceProcessor,
+            ),
+            ("doubler_processor".to_string(), ProcessorType::Other),
+        ]);
         let cancellation_token = CancellationToken::new();
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
             parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
+            processor_types_mappings: Arc::new(Mutex::new(processor_mappings)),
         };
 
         let app = Router::new()
             .route(&create_processor_route, post(super::create_processor))
-            .route(&start_processor_route, post(super::start_processor))
+            .route(&start_processor_route, patch(super::start_processor))
             .with_state(state);
 
         let test_server = TestServer::new(app).unwrap();
@@ -444,7 +640,7 @@ mod tests {
         };
 
         let response = test_server
-            .post(start_processor_route)
+            .patch(start_processor_route)
             .json(&json!(request_body))
             .await;
         response.assert_status_ok();

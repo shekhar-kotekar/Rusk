@@ -1,7 +1,7 @@
 use axum::{extract::State, Json};
 use http::StatusCode;
 
-use crate::{processors::models::ProcessorStatus, AppState};
+use crate::{processors::models::ProcessorCommand, AppState};
 
 use super::models::{ClusterInfo, ProcessorInfo};
 
@@ -14,23 +14,17 @@ pub async fn is_alive() -> &'static str {
 pub async fn get_cluster_info(
     State(server_state): State<AppState>,
 ) -> Result<Json<ClusterInfo>, StatusCode> {
-    let processors_in_clusteer = server_state
-        .parent_processor_tx
-        .lock()
-        .await
-        .keys()
-        .map(|processor_id| -> ProcessorInfo {
-            ProcessorInfo {
-                processor_id: processor_id.to_string(),
-                status: ProcessorStatus::Stopped,
-                number_of_packets_processed: 0,
-            }
-        })
-        .collect();
+    let mut processors_in_cluster: Vec<ProcessorInfo> = vec![];
+    for processor_tx in server_state.parent_processor_tx.lock().await.values() {
+        let (resp_tx, resp_rx) = tokio::sync::oneshot::channel();
+        let command = ProcessorCommand::GetInfo { resp: resp_tx };
+        processor_tx.send(command).await.unwrap();
+        processors_in_cluster.push(resp_rx.await.unwrap());
+    }
 
     let cluster_info = ClusterInfo {
         cluster_name: "Rusk Default Cluster".to_string(),
-        processors: processors_in_clusteer,
+        processors: processors_in_cluster,
     };
 
     Ok(Json(cluster_info))
@@ -49,7 +43,7 @@ mod tests {
 
     use tokio::sync::Mutex;
 
-    use crate::handlers::models::ClusterInfo;
+    use crate::{handlers::models::ClusterInfo, processors::models::ProcessorType};
 
     #[tokio::test]
     async fn test_is_alive() {
@@ -67,12 +61,17 @@ mod tests {
             processor_queue_length: 10,
         };
 
+        let processor_mappings = HashMap::from([
+            ("adder".to_string(), ProcessorType::SourceProcessor),
+            ("doubler".to_string(), ProcessorType::Other),
+        ]);
         let cancellation_token = CancellationToken::new();
         let state = super::AppState {
             config,
             cancellation_token: cancellation_token.clone(),
             peers_tx: Arc::new(Mutex::new(HashMap::new())),
             parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
+            processor_types_mappings: Arc::new(Mutex::new(processor_mappings)),
         };
         let app = Router::new()
             .route("/get_cluster_info", get(super::get_cluster_info))

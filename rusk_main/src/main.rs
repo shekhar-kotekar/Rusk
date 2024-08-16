@@ -2,13 +2,13 @@ use std::{collections::HashMap, sync::Arc};
 
 use axum::{
     extract::FromRef,
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
     Router,
 };
 use commons::MainConfig;
 use handlers::{cluster_request_handlers, processor_request_handlers};
 use http::{header, Method};
-use processors::models::{InMemoryPacket, Message, ProcessorCommand};
+use processors::models::{InMemoryPacket, Message, ProcessorCommand, ProcessorType};
 use rand::Rng;
 use tokio::{
     signal,
@@ -27,6 +27,7 @@ struct AppState {
     cancellation_token: CancellationToken,
     peers_tx: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
     parent_processor_tx: Arc<Mutex<HashMap<Uuid, mpsc::Sender<ProcessorCommand>>>>,
+    processor_types_mappings: Arc<Mutex<HashMap<String, ProcessorType>>>,
 }
 
 #[tokio::main]
@@ -36,11 +37,19 @@ async fn main() {
 
     let main_config: MainConfig = commons::get_config().rusk_main;
     let cancellation_token = CancellationToken::new();
+
+    // TODO: Read these mappings from a config file
+    let processor_mappings = HashMap::from([
+        ("adder".to_string(), ProcessorType::SourceProcessor),
+        ("doubler".to_string(), ProcessorType::Other),
+    ]);
+
     let state = AppState {
         config: main_config.clone(),
         cancellation_token: cancellation_token.clone(),
         peers_tx: Arc::new(Mutex::new(HashMap::new())),
         parent_processor_tx: Arc::new(Mutex::new(HashMap::new())),
+        processor_types_mappings: Arc::new(Mutex::new(processor_mappings)),
     };
 
     let cors = CorsLayer::new()
@@ -61,11 +70,11 @@ async fn main() {
         )
         .route(
             "/processor/stop",
-            post(processor_request_handlers::stop_processor),
+            patch(processor_request_handlers::stop_processor),
         )
         .route(
             "/processor/start",
-            post(processor_request_handlers::start_processor),
+            patch(processor_request_handlers::start_processor),
         )
         .route(
             "/processor/create",
@@ -76,7 +85,7 @@ async fn main() {
             get(processor_request_handlers::get_status),
         )
         .route(
-            "/processor/get_info",
+            "/processor/get_info/:processor_id",
             get(processor_request_handlers::get_processor_info),
         )
         .route(
@@ -85,7 +94,7 @@ async fn main() {
         )
         .route(
             "/processor/disconnect",
-            post(processor_request_handlers::disconnect_processors),
+            delete(processor_request_handlers::disconnect_processors),
         )
         .layer(cors)
         .with_state(state);
@@ -159,16 +168,16 @@ fn adder_func() -> Option<InMemoryPacket> {
     })
 }
 
-// fn doubler_func(packet: InMemoryPacket) -> Option<InMemoryPacket> {
-//     let new_data = packet.data.iter().map(|x| x * 2).collect();
-//     let new_packet = InMemoryPacket {
-//         id: packet.id,
-//         data: new_data,
-//     };
-//     tracing::info!(
-//         "old data: {:?}, new data: {:?}",
-//         packet.data,
-//         new_packet.data
-//     );
-//     Some(new_packet)
-// }
+fn doubler_func(packet: InMemoryPacket) -> Option<InMemoryPacket> {
+    let new_data = packet.data.iter().map(|x| x * 2).collect();
+    let new_packet = InMemoryPacket {
+        id: packet.id,
+        data: new_data,
+    };
+    tracing::info!(
+        "old data: {:?}, new data: {:?}",
+        packet.data,
+        new_packet.data
+    );
+    Some(new_packet)
+}
