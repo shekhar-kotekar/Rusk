@@ -63,6 +63,7 @@ impl InMemoryProcessor {
                         }
                         ProcessorCommand::Start {resp} => {
                             self.status = ProcessorStatus::Running;
+                            println!("{}: Started running...", self.processor_name);
                             resp.send(self.status).unwrap();
                         }
                         ProcessorCommand::GetStatus {resp} => {
@@ -87,12 +88,18 @@ impl InMemoryProcessor {
                     }
                 }
                 Some(command) = self.peers_rx.recv() => {
+                    println!("Received command from a peer");
                     match command {
                         Message::InMemoryMessage(packet) if self.status == ProcessorStatus::Running => {
                             tracing::info!(
                                 "{}: Received packet from someone. Processing it.",
                                 self.processor_name
                             );
+                            println!(
+                                "{}: Received packet from someone. Processing it.",
+                                self.processor_name
+                            );
+
                             if !self.peers_tx.is_empty() {
                             let processed_packet = process_packet_func(packet);
                             match processed_packet {
@@ -102,14 +109,16 @@ impl InMemoryProcessor {
                                             .send(Message::InMemoryMessage(packet.clone()))
                                             .await;
                                     }
+                                    tracing::info!("{}: Sent packet to {} processors", self.processor_name, self.peers_tx.len());
                                     self.packets_processed_count += 1;
+                                    tracing::info!("{}: Processed {} packets. Will sleep now for a while.", self.processor_name, self.packets_processed_count);
                                 }
                                 None => {
                                     tracing::error!(
                                         "{}: Error processing packet", self.processor_name);
                                 }
                             }
-                        }
+                            }
                         }
                         _ => {}
                     }
@@ -120,5 +129,57 @@ impl InMemoryProcessor {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{thread::sleep, time::Duration};
+
+    use super::*;
+    use crate::{doubler_func, processors::models::ProcessorStatus};
+    use tokio::sync::{mpsc, oneshot};
+
+    #[tokio::test]
+    async fn test_in_memory_processor() {
+        let (parent_tx, parent_rx) = mpsc::channel(10);
+        let (peers_tx, peers_rx) = mpsc::channel(10);
+        let cancellation_token = CancellationToken::new();
+
+        let mut sink_processor = InMemoryProcessor::new(
+            "test_in_memory_processor".to_string(),
+            peers_rx,
+            parent_rx,
+            cancellation_token.clone(),
+        );
+
+        tokio::spawn(async move {
+            sink_processor.run(doubler_func).await;
+        });
+
+        let (oneshot_tx, oneshot_rx) = oneshot::channel();
+        let command = ProcessorCommand::Start { resp: oneshot_tx };
+
+        parent_tx.send(command).await.unwrap();
+        let status = oneshot_rx.await.unwrap();
+        assert_eq!(status, ProcessorStatus::Running);
+
+        sleep(Duration::from_millis(1000));
+
+        let message = Message::InMemoryMessage(InMemoryPacket {
+            id: Uuid::new_v4(),
+            data: vec![1, 2, 3, 4],
+        });
+
+        peers_tx.send(message).await.unwrap();
+
+        let (oneshot_tx, oneshot_rx) = oneshot::channel();
+        let command = ProcessorCommand::GetInfo { resp: oneshot_tx };
+
+        parent_tx.send(command).await.unwrap();
+        let status = oneshot_rx.await.unwrap();
+        println!("{:?}", status);
+
+        cancellation_token.cancel();
     }
 }

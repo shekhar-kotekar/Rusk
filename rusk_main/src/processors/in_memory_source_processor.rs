@@ -64,6 +64,7 @@ impl InMemorySourceProcessor {
                     match command {
                         ProcessorCommand::Start {resp} => {
                             self.status = ProcessorStatus::Running;
+                            println!("{}: Started running...", self.processor_name);
                             resp.send(self.status).unwrap();
                         }
                         ProcessorCommand::Stop {resp} => {
@@ -94,20 +95,68 @@ impl InMemorySourceProcessor {
                 }
                 _ = self.cancellation_token.cancelled() => {
                     tracing::info!("{}: Cancellation token received. Shutting down.", self.processor_name);
+                    println!("{}: Cancellation token received. Shutting down.", self.processor_name);
                     break;
                 }
-                else => {
-                    if self.status == ProcessorStatus::Running {
-                        if let Some(packet) = generate_packet_func() {
-                            for tx in self.peers_tx.values() {
-                                tx.send(Message::InMemoryMessage(packet.clone())).await.unwrap();
+                _ = sleep(Duration::from_millis(100)) => {
+                    if self.status == ProcessorStatus::Running && !self.peers_tx.is_empty() {
+                            if let Some(packet) = generate_packet_func() {
+                                for tx in self.peers_tx.values() {
+                                    tx.send(Message::InMemoryMessage(packet.clone())).await.unwrap();
+                                }
+                                tracing::info!("{}: Sent packet to {} processors", self.processor_name, self.peers_tx.len());
+                                self.packets_processed_count += 1;
+                            tracing::info!("{}: Processed {} packets. Will sleep now for a while.", self.processor_name, self.packets_processed_count);
                             }
-                        }
-                        self.packets_processed_count += 1;
-                        sleep(Duration::from_secs(3)).await;
                     }
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::adder_func;
+    use tokio::sync::{mpsc, oneshot};
+
+    #[tokio::test]
+    async fn test_in_memory_source_processor() {
+        let (parent_tx, parent_rx) = mpsc::channel(5);
+        let cancellation_token = CancellationToken::new();
+        let mut processor = InMemorySourceProcessor::new(
+            "test_processor".to_string(),
+            parent_rx,
+            HashMap::new(),
+            cancellation_token.clone(),
+        );
+        tokio::spawn(async move {
+            processor.run(adder_func).await;
+        });
+        let (oneshot_tx, oneshot_rx) = oneshot::channel();
+        let command = ProcessorCommand::Start { resp: oneshot_tx };
+
+        parent_tx.send(command).await.unwrap();
+        let status = oneshot_rx.await.unwrap();
+        assert_eq!(status, ProcessorStatus::Running);
+
+        sleep(Duration::from_secs(1)).await;
+
+        let (oneshot_tx, oneshot_rx) = oneshot::channel();
+        let command = ProcessorCommand::GetInfo { resp: oneshot_tx };
+        parent_tx.send(command).await.unwrap();
+        let processor_info = oneshot_rx.await.unwrap();
+        println!("{:?}", processor_info);
+        //assert_eq!(processor_info.packets_processed_count, 1);
+
+        let (oneshot_tx, oneshot_rx) = oneshot::channel();
+        let command = ProcessorCommand::GetInfo { resp: oneshot_tx };
+        sleep(Duration::from_secs(2)).await;
+        parent_tx.send(command).await.unwrap();
+        let processor_info = oneshot_rx.await.unwrap();
+        println!("{:?}", processor_info);
+
+        cancellation_token.cancel();
     }
 }
