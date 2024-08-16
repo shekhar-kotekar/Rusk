@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use crate::{
     handlers::models::ProcessorInfo,
@@ -9,7 +9,7 @@ use super::{
     base_processor::{ProcessorConnection, SourceProcessor},
     models::{InMemoryPacket, ProcessorCommand},
 };
-use tokio::sync::mpsc;
+use tokio::{sync::mpsc, time::sleep};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -20,6 +20,7 @@ pub struct InMemorySourceProcessor {
     parent_rx: mpsc::Receiver<ProcessorCommand>,
     peers_tx: HashMap<Uuid, mpsc::Sender<Message>>,
     cancellation_token: CancellationToken,
+    packets_processed_count: u64,
 }
 
 impl SourceProcessor for InMemorySourceProcessor {
@@ -36,6 +37,7 @@ impl SourceProcessor for InMemorySourceProcessor {
             parent_rx,
             peers_tx: peer_processors_tx,
             cancellation_token,
+            packets_processed_count: 0,
         }
     }
 }
@@ -84,7 +86,7 @@ impl InMemorySourceProcessor {
                             let processor_info = ProcessorInfo {
                                 processor_id: self.processor_id.to_string(),
                                 status: self.status,
-                                number_of_packets_processed: 0,
+                                packets_processed_count: self.packets_processed_count,
                             };
                             resp.send(processor_info).unwrap();
                         }
@@ -101,6 +103,8 @@ impl InMemorySourceProcessor {
                                 tx.send(Message::InMemoryMessage(packet.clone())).await.unwrap();
                             }
                         }
+                        self.packets_processed_count += 1;
+                        sleep(Duration::from_secs(3)).await;
                     }
                 }
             }

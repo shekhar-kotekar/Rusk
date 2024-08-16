@@ -16,7 +16,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use super::models::{ProcessorConnectionRequest, ProcessorInfo, RequestDetails, ResponseDetails};
+use super::models::{ProcessorInfo, RequestDetails, ResponseDetails};
 
 const PARENT_PROCESSOR_CHANNEL_SIZE: usize = 10;
 
@@ -256,91 +256,6 @@ pub async fn get_processor_info(
             tx.send(command).await.unwrap();
             let processor_info = oneshot_rx.await.unwrap();
             let result = Json(processor_info);
-            return Ok(result);
-        }
-        None => {
-            return Err(StatusCode::NOT_FOUND);
-        }
-    }
-}
-
-#[tracing::instrument]
-pub async fn connect_processors(
-    State(server_state): State<AppState>,
-    Json(payload): Json<ProcessorConnectionRequest>,
-) -> Result<Json<ProcessorInfo>, StatusCode> {
-    let source_processor_id = Uuid::parse_str(&payload.source_processor_id).unwrap();
-    let destination_processor_id = Uuid::parse_str(&payload.destination_processor_id).unwrap();
-
-    match server_state
-        .peers_tx
-        .lock()
-        .await
-        .get(&destination_processor_id)
-    {
-        Some(tx) => {
-            match server_state
-                .parent_processor_tx
-                .lock()
-                .await
-                .get(&source_processor_id)
-            {
-                Some(source_tx) => {
-                    let (oneshot_tx, oneshot_rx) = oneshot::channel();
-                    let command = ProcessorCommand::Connect {
-                        destination_processor_id,
-                        destination_processor_tx: tx.clone(),
-                        resp: oneshot_tx,
-                    };
-
-                    source_tx.send(command).await.unwrap();
-                    let processor_current_status = oneshot_rx.await.unwrap();
-                    let result = Json(ProcessorInfo {
-                        processor_id: source_processor_id.to_string(),
-                        status: processor_current_status,
-                        number_of_packets_processed: 0,
-                    });
-                    return Ok(result);
-                }
-                None => {
-                    return Err(StatusCode::NOT_FOUND);
-                }
-            }
-        }
-        None => {
-            return Err(StatusCode::NOT_FOUND);
-        }
-    }
-}
-
-#[tracing::instrument]
-pub async fn disconnect_processors(
-    State(server_state): State<AppState>,
-    Json(payload): Json<ProcessorConnectionRequest>,
-) -> Result<Json<ProcessorInfo>, StatusCode> {
-    let source_processor_id = Uuid::parse_str(&payload.source_processor_id).unwrap();
-    let destination_processor_id = Uuid::parse_str(&payload.destination_processor_id).unwrap();
-
-    match server_state
-        .parent_processor_tx
-        .lock()
-        .await
-        .get(&source_processor_id)
-    {
-        Some(source_tx) => {
-            let (oneshot_tx, oneshot_rx) = oneshot::channel();
-            let command = ProcessorCommand::Disconnect {
-                destination_processor_id,
-                resp: oneshot_tx,
-            };
-
-            source_tx.send(command).await.unwrap();
-            let processor_current_status = oneshot_rx.await.unwrap();
-            let result = Json(ProcessorInfo {
-                processor_id: source_processor_id.to_string(),
-                status: processor_current_status,
-                number_of_packets_processed: 0,
-            });
             return Ok(result);
         }
         None => {

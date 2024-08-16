@@ -17,6 +17,7 @@ pub struct InMemoryProcessor {
     peers_rx: mpsc::Receiver<Message>,
     peers_tx: HashMap<Uuid, mpsc::Sender<Message>>,
     cancellation_token: CancellationToken,
+    packets_processed_count: u64,
 }
 
 impl SinkProcessor for InMemoryProcessor {
@@ -34,6 +35,7 @@ impl SinkProcessor for InMemoryProcessor {
             peers_rx,
             peers_tx: HashMap::new(),
             cancellation_token,
+            packets_processed_count: 0,
         }
     }
 }
@@ -78,7 +80,7 @@ impl InMemoryProcessor {
                             let processor_info = ProcessorInfo {
                                 processor_id: self.processor_id.to_string(),
                                 status: self.status,
-                                number_of_packets_processed: 0,
+                                packets_processed_count: self.packets_processed_count,
                             };
                             resp.send(processor_info).unwrap();
                         }
@@ -100,6 +102,7 @@ impl InMemoryProcessor {
                                             .send(Message::InMemoryMessage(packet.clone()))
                                             .await;
                                     }
+                                    self.packets_processed_count += 1;
                                 }
                                 None => {
                                     tracing::error!(

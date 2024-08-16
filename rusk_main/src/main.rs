@@ -57,7 +57,6 @@ async fn main() {
         .allow_headers([header::CONTENT_TYPE])
         .allow_origin(Any);
 
-    // TODO: Add route for pause and resume processor
     let server = Router::new()
         .route("/cluster/is_alive", get(cluster_request_handlers::is_alive))
         .route(
@@ -90,11 +89,11 @@ async fn main() {
         )
         .route(
             "/processor/connect",
-            post(processor_request_handlers::connect_processors),
+            post(cluster_request_handlers::connect_processors),
         )
         .route(
             "/processor/disconnect",
-            delete(processor_request_handlers::disconnect_processors),
+            delete(cluster_request_handlers::disconnect_processors),
         )
         .layer(cors)
         .with_state(state);
@@ -109,24 +108,6 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal(cancellation_token))
         .await
         .unwrap();
-
-    // let (tx_for_doubler, rx_for_doubler) =
-    //     mpsc::channel::<ProcessorCommand>(main_config.processor_queue_length);
-
-    // let mut doubler_processor = InMemoryProcessor::new("Doubler".to_string(), rx_for_doubler);
-    // adder_processor.add_tx(tx_for_doubler.clone());
-    // processor_tx.insert(doubler_processor.processor_id, tx_for_doubler);
-
-    // let adder_handle = tokio::spawn(async move {
-    //     adder_processor.run(adder_func).await;
-    // });
-    // let doubler_handle = tokio::spawn(async move {
-    //     doubler_processor.run(doubler_func).await;
-    // });
-
-    // for (_, tx) in processor_tx.iter() {
-    //     tx.send(ProcessorCommand::Start).await.unwrap();
-    // }
 }
 
 async fn shutdown_signal(cancellation_token: CancellationToken) {

@@ -28,5 +28,5 @@ pub struct ResponseDetails {
 pub struct ProcessorInfo {
     pub processor_id: String,
     pub status: ProcessorStatus,
-    pub number_of_packets_processed: u64,
+    pub packets_processed_count: u64,
 }
