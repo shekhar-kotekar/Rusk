@@ -9,7 +9,9 @@ NiFi equivalent built using Rust. Architecture diagram and other high level deta
 
 ### Local development
 #### Local testing
-Execute `make build PACKAGE=<package name without rust_prefix>` command. For example, to build `rusk_main` package, execute `make build PACKAGE=main`. Similarly we can execute `make deploy` command to build and deploy image in local `kind` based cluster.
+- Execute `make build PACKAGE=<package name without rust_prefix>` command. For example, to build `rusk_main` package, execute `make build PACKAGE=main`. Similarly we can execute `make deploy` command to build and deploy image in local `kind` based cluster.
+- To Execute unit test for a particular package within a workspace, execute `make test PACKAGE=<package name>`. Example : `make test PACKAGE=main`
+- To execute unit tests for a single module use this command: `cargo test in_memory_processor -- --nocapture` where `in_memory_processor` is a name of the module which we want to test.
 
 ## Rusk Main module
 Accepts requests from UI and takes actions like adding a processor, connecting 2 processors, etc.
@@ -20,8 +22,6 @@ Accepts requests from UI and takes actions like adding a processor, connecting 2
 
 ## Useful commands:
 - To add a new library package, execute `cargo new --lib <PACKAGE_NAME> --vcs none`
-- To run an individual package within a workspace, execute `cargo run -p <MODULE NAME>`. Example : `cargo run -p rusk_web`
-- To Execute unit test for a particular module, execute `cargo test --package <module name>`. Example : `cargo test --package rusk_web`
 
 ## Content Repository
 For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.

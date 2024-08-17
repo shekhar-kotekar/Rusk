@@ -96,8 +96,8 @@ impl InMemoryProcessor {
                                 self.processor_name
                             );
                             println!(
-                                "{}: Received packet from someone. Processing it.",
-                                self.processor_name
+                                "{}: Received {:?} packet from someone. Processing it.",
+                                self.processor_name, packet
                             );
 
                             if !self.peers_tx.is_empty() {
@@ -125,6 +125,7 @@ impl InMemoryProcessor {
                 }
                 _ = self.cancellation_token.cancelled() => {
                     tracing::info!("{}: Cancellation token received. Shutting down.", self.processor_name);
+                    println!("{}: Cancellation token received. Shutting down.", self.processor_name);
                     break;
                 }
             }
@@ -146,7 +147,7 @@ mod tests {
         let (peers_tx, peers_rx) = mpsc::channel(10);
         let cancellation_token = CancellationToken::new();
 
-        let mut sink_processor = InMemoryProcessor::new(
+        let mut processor = InMemoryProcessor::new(
             "test_in_memory_processor".to_string(),
             peers_rx,
             parent_rx,
@@ -154,17 +155,28 @@ mod tests {
         );
 
         tokio::spawn(async move {
-            sink_processor.run(doubler_func).await;
+            processor.run(doubler_func).await;
         });
 
-        let (oneshot_tx, oneshot_rx) = oneshot::channel();
+        let (oneshot_tx, oneshot_rx) = oneshot::channel::<ProcessorStatus>();
         let command = ProcessorCommand::Start { resp: oneshot_tx };
 
         parent_tx.send(command).await.unwrap();
         let status = oneshot_rx.await.unwrap();
         assert_eq!(status, ProcessorStatus::Running);
 
-        sleep(Duration::from_millis(1000));
+        let (sink_tx, mut sink_rx) = mpsc::channel::<Message>(10);
+        let (oneshot_tx, oneshot_rx) = oneshot::channel::<ProcessorStatus>();
+        let connect_processor_command = ProcessorCommand::Connect {
+            destination_processor_id: Uuid::new_v4(),
+            destination_processor_tx: sink_tx,
+            resp: oneshot_tx,
+        };
+        parent_tx.send(connect_processor_command).await.unwrap();
+        let status = oneshot_rx.await.unwrap();
+        assert_eq!(status, ProcessorStatus::Running);
+
+        sleep(Duration::from_millis(500));
 
         let message = Message::InMemoryMessage(InMemoryPacket {
             id: Uuid::new_v4(),
@@ -173,12 +185,13 @@ mod tests {
 
         peers_tx.send(message).await.unwrap();
 
-        let (oneshot_tx, oneshot_rx) = oneshot::channel();
-        let command = ProcessorCommand::GetInfo { resp: oneshot_tx };
-
-        parent_tx.send(command).await.unwrap();
-        let status = oneshot_rx.await.unwrap();
-        println!("{:?}", status);
+        let message_from_processor = sink_rx.recv().await.unwrap();
+        match message_from_processor {
+            Message::InMemoryMessage(packet) => {
+                assert_eq!(packet.data, vec![2, 4, 6, 8]);
+            }
+            _ => panic!("Expected InMemoryMessage"),
+        }
 
         cancellation_token.cancel();
     }
