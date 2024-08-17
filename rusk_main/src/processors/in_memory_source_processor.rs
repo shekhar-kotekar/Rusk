@@ -1,14 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
-use crate::{
-    handlers::models::ProcessorInfo,
-    processors::models::{Message, ProcessorStatus},
-};
+use crate::handlers::models::ProcessorInfo;
 
-use super::{
-    base_processor::{ProcessorConnection, SourceProcessor},
-    models::{InMemoryPacket, ProcessorCommand},
-};
+use super::base_processor::{ProcessorConnection, SourceProcessor};
+use super::models::{InMemoryPacket, Message, ProcessorCommand, ProcessorStatus};
 use tokio::{sync::mpsc, time::sleep};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;

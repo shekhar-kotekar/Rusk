@@ -1,9 +1,8 @@
-use crate::{handlers::models::ProcessorInfo, processors::models::ProcessorStatus};
+use crate::handlers::models::ProcessorInfo;
 
-use super::{
-    base_processor::{ProcessorConnection, SinkProcessor},
-    models::{InMemoryPacket, Message, ProcessorCommand},
-};
+use super::base_processor::{ProcessorConnection, SinkProcessor};
+use super::models::{InMemoryPacket, Message, ProcessorCommand, ProcessorStatus};
+
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -92,11 +91,11 @@ impl InMemoryProcessor {
                     match command {
                         Message::InMemoryMessage(packet) if self.status == ProcessorStatus::Running => {
                             tracing::info!(
-                                "{}: Received packet from someone. Processing it.",
+                                "{}: Packet received.",
                                 self.processor_name
                             );
                             println!(
-                                "{}: Received {:?} packet from someone. Processing it.",
+                                "{}: Packet received : {:?}",
                                 self.processor_name, packet
                             );
 
@@ -111,7 +110,7 @@ impl InMemoryProcessor {
                                     }
                                     tracing::info!("{}: Sent packet to {} processors", self.processor_name, self.peers_tx.len());
                                     self.packets_processed_count += 1;
-                                    tracing::info!("{}: Processed {} packets. Will sleep now for a while.", self.processor_name, self.packets_processed_count);
+                                    tracing::info!("{}: Processed {} packets.", self.processor_name, self.packets_processed_count);
                                 }
                                 None => {
                                     tracing::error!(
@@ -120,7 +119,12 @@ impl InMemoryProcessor {
                             }
                             }
                         }
-                        _ => {}
+                        other => {
+                            tracing::error!(
+                                "{}: Received an unexpected message : {:?}",
+                                self.processor_name, other
+                            );
+                        }
                     }
                 }
                 _ = self.cancellation_token.cancelled() => {
