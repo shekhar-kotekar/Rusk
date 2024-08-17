@@ -21,6 +21,8 @@ spec:
         ports:
         - containerPort: 5055
           name: rusk-main-svc
+        - containerPort: 6669
+          name: rusk-main-cnsl
         resources:
           requests:
             memory: "32Mi"
@@ -41,5 +43,20 @@ spec:
     port: 8080
     nodePort: 30002
     targetPort: rusk-main-svc
+  selector:
+    app: rusk-main
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rusk-man-cnl-svc
+  namespace: rusk
+spec:
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 6669
+    nodePort: 30000
+    targetPort: rusk-main-cnsl
   selector:
     app: rusk-main

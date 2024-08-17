@@ -24,7 +24,7 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
   extraPortMappings:
-  - containerPort: 30000 # for rusk_web
+  - containerPort: 30000 # for tokio-console
     hostPort: 30000
     listenAddress: "0.0.0.0"
     protocol: TCP

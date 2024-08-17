@@ -23,6 +23,9 @@ Accepts requests from UI and takes actions like adding a processor, connecting 2
 ## Useful commands:
 - To add a new library package, execute `cargo new --lib <PACKAGE_NAME> --vcs none`
 
+## Tokio console
+
+
 ## Content Repository
 For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.
 
