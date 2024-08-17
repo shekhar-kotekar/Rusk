@@ -24,7 +24,15 @@ Accepts requests from UI and takes actions like adding a processor, connecting 2
 - To add a new library package, execute `cargo new --lib <PACKAGE_NAME> --vcs none`
 
 ## Tokio console
-
+As of now we can connect tokio console only when we run `rusk_main` in local. We cannot connect tokio console when it is running inside a k8s pod.
+To use Tokio console in local, follow these steps:
+- Move `console-subscriber` dependency from `dev-dependencies` to `dependencies`.
+- Uncomment `//console_subscriber::init();` in `main.rs` of rusk_main package.
+- Comment `commons::enable_tracing();` in `main.rs` of rusk_main package.
+- Build `rusk_main` using `RUSTFLAGS="--cfg tokio_unstable" cargo build --package rusk_main --release` command
+- Execute `./target/release/rusk_main`
+- In a separate console execute `tokio-console` command
+- Send request to `rusk_main` using Postman or curl.
 
 ## Content Repository
 For producer processors, instead of processor creating FlowFile by itself, it will send the content or location of content (in case of file) to the content repositry. Content repository will create a flow file and send it to the processor after which processor starts using it.
